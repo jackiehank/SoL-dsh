@@ -1,0 +1,15 @@
+// kiln 配置 —— 随仓库提交（项目共享），放在仓库根。
+// 位置：<仓库根>/.kilnconfig.jsonc（kiln config path 打印路径）
+// 格式：JSONC（JSON + 注释）；除注释外是严格 JSON，不支持尾逗号。
+{
+  // action 词表：每个项目可以不同 —— 这是 kiln 的自定义点。
+  "actions": {
+    "names": ["ask", "hypothesize", "collect", "test", "conclude", "apply"],
+    "start": "ask",
+    "terminal": ["conclude", "apply"]
+  },
+  // VCS 后端：auto（.jj 优先，否则 .git）/ git / jj
+  "vcs": "auto",
+  // worktree 模式：off（默认，允许在 main 提交）| on（动作只在 worktree 提交）
+  "worktree": "off"
+}
