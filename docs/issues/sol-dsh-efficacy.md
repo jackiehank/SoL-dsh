@@ -335,3 +335,50 @@ H1′：同一长会话任务里，开启 ObsPack 后**后续请求对那条大�
 - 仍为 **n=1**，cache read 由 provider 与会话内容共同决定；40% 只能读作“方向明确、量级可观”，
   不是稳定估计。任务刻意把关键值放进占位符首/尾摘录，因此“占位符够用、无需召回”这一条也成立；
   若关键值在文件中段，收益会被召回成本吃掉一部分（未测）。
+
+## 激进档测试方案（hypothesize）
+
+### 激进档到底是什么
+
+| 机制 | 开关 | 额外成本 | 风险 | 判定它“跑通”的证据 |
+| --- | --- | --- | --- | --- |
+| Evidence-Preserving Reducer | `evidencePreservingReducer` + `reducerProvider/reducerModel` | 每条候选日志 **1 次额外模型调用** | 日志离开本机；`likely-secret` 只是启发式 | 账本 `applied`（回执替换成功且引文校验通过）与 `fallback`（拒绝并保留原文） |
+| Online Context Compact | `onlineContextCompact` | 每个完成边界 **1 次摘要/压缩调用** | 改变后续 surface，影响进行中的运行 | 会话里出现 `compaction/*`、同一 turn 继续、计划保留 |
+
+两者都不参与“省 token”的主比较：辅助调用的 token 不进主会话日志，必须单独记。
+
+### D1：Reducer 单点验证（先做，不外发敏感日志）
+
+- 素材：`.tmp/efficacy/t4/` 建一个仅本地的 `package.json` + `fail.mjs`，`fail.mjs` 打印 >4 KiB 的
+  失败日志（含 `FAIL suite/login`、`error: token expired` 等），`npm test` 退出码非 0。
+- 任务：子代理运行 `npm test`，说出第一条失败用例名；命令必须落在诊断命令表内（`npm test` 命中）。
+- 预期：结果 content 变成 `sol_pi_evidence_receipt_v1` 回执，且
+  `receipt_bytes < source_bytes`、账本 `applied`、`source_artifact` 存在、引文可在归档中逐字找到。
+- 反证：没有 `applied`（原因可能是模型输出不合规、回执不够小、疑似密钥）→ 读账本原因，如实记录。
+- 附加安全用例：日志里塞 `API_KEY=sk-live-...` → 必须 `fallback: likely-secret`，原文不动。
+- 成本：2 次运行 ×（1 次主会话 + 1 次小的归约调用）。
+
+### D2：Compact 单点验证（需要你确认会改当前运行中的 surface）
+
+- 任务：子代理用 `todo_write` 建 3 步计划（1 项 in_progress、2 项 pending），完成第 1 步后
+  把计划更新为 completed，再继续做第 2 步（例如对 8 个小文件逐个算 hash，制造足够多的 step）。
+- 预期：完成边界之后的 `agent/pre-step` 触发一次 `compactRegion`；
+  会话里出现 `compaction/*`，**同一 turn 内**出现后续 assistant/tool 消息（没有新的 user 输入），
+  账本记 `compacted` 且 `shadowedTokenCount > 0`，计划与未完成步骤仍在。
+- 反证：无 `compaction` 事件、或压缩后 turn 结束/需要新输入、或计划丢失 → 记为失败，并保留账本原因
+  （`no-range` / `cooldown` / `over-horizon` / `fallback`）。
+- 成本：1 次运行、约 10–14 个 step，外加一次摘要调用。
+
+### 执行顺序、开关与预算
+
+1. 先跑 D1（不外发业务数据，只发本地合成日志；仍属于“日志出机”，跑前再确认一次）；
+2. 再跑 D2（会改变运行中的 surface，且需要真实 compaction 可用）；
+3. 两次都要 OFF→ON→OFF 切配置（每次 2 个 plugin_manager 操作，不花模型 token）；
+4. 预算：D1 两次运行 + D2 一次运行；若 D2 触发压缩，额外一次摘要调用（预估 10–20k token）；
+   总额控制在接近上一轮 C0/C1 的量级，跑前报一次预算。
+
+### 观测与记录
+
+- 主会话：`tools/measure-sessions.mjs` 的 steps / input / cacheR / total、`compaction/*` 计数（待补列）；
+- 辅助调用：只从账本取（`applied.receiptBytes`、`sourceBytes`、`reducer_total_tokens`、`compacted.shadowedTokens`）；
+- 结论必须分开写“机制是否跑通”和“是否有净收益”；本轮**只承诺前者**。
