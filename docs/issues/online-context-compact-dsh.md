@@ -55,3 +55,14 @@ turn 里自动续跑；原生拒绝（太小/已压缩/摘要被截断）记录 
   节点 0 是 system/message，永不入区间。
 - DSH 的计划：复用内建 `todo_write`（观察参数，不另造工具）；todo 没有 id，以 `content` 作稳定键，
   content 被改写按新步骤处理（只会少压，不会错压）。
+
+## 测试与结果
+
+`tests/compact.test.mjs`（5 项，全绿）：
+
+- 计划跟踪：旧步骤 in_progress → completed 才产生边界；新引入 completed 不算；边界只消费一次；
+- 经济性：净收益非正、冷却、视界不够、非首次 margin、窗口压力越过冷却，五个分支各自命中；
+- 区间选择：节点 0（system）永不入区间、尾部按 `compactKeepRecentTokens` 保留、不足三个节点返回 undefined；
+- 装配（假 compaction/tokenMeter）：完成边界后的 pre-step 调一次 `compactRegion(1, 2, agent, signal)`，
+  同一 turn 返回 `{kind:'enter'}`；没有新边界时不再调用；`compaction`/`tokenMeter` 缺失时不激活；
+  `compactRegion` 抛错时 fail-open（返回 `{kind:'enter'}`）并记 `fallback` 账本。
