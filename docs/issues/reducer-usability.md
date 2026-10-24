@@ -67,3 +67,12 @@ Reducer 的链路已通，但真机始终停在 `fallback: unverifiable-quote`�
 判定：账本出现 `applied` 且 `receiptBytes < sourceBytes`；失败必须仍是 `unverifiable-quote` 且原文不变。
 执行仍用 `enable-bundle` 开关（开 reducer、关 compact），每轮 `remove_bundle` 回滚并核对 profile sha256。
 成本：R0–R3 各一次归约调用（约 4k 输入 + ≤2k 输出），R4 一次；总额可控。
+
+## 落地计划
+
+1. `plugin/lib/reducer.js`：`callReducer` 接受 `reasoningEffort`/`temperature`，同时传给
+   `prepareCall` 与 `stream`；提示词升到 v2（短引用、禁省略号/拼接、≤200 字符、evidence ≤5）；
+   校验失败重试一次；
+2. `plugin/lib/config.js`：新增 `reducerReasoningEffort`（可选字符串）、`reducerTemperature`
+   （可选 0–2），非法值装配期报错；
+3. `enable-bundle` 增加 reducer 开关组，按 R0–R4 逐组跑，账本与 profile sha256 作为判据。
