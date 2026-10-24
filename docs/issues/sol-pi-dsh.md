@@ -61,3 +61,22 @@
 - 测试：`tests/{config,observation-pack,action-fusion}.test.mjs`，31 项通过；测试替身
   `tests/helpers.mjs` 只模拟本插件用到的契约（工具分层/tool 管线/finalizeContent），
   真实管线行为仍需装到 profile 后验证。
+
+## 实测（装进 desktop profile，两个机制临时打开）
+
+- **三个真实装配缺陷**（都是在真机上才暴露的，单测替身覆盖不到）：
+  1. `export default apply` 和 `export const inject` 同时存在时，loader 取 default 函数，`inject` 不生效；
+     一旦代码访问 `ctx.tools` 就报 `cannot get property "tools" without inject`。去掉 default 导出即恢复。
+  2. 内建 `edit`/`write`/`pwsh` 由 agent preset 注册在**各自 agent 的 scope** 里，`ctx.tools.get(name)`
+     的全局视图拿不到 → `then_run` 永远装不上（诊断工具显示 `bases-not-found`）。改成 `ctx.tools.get(name, agent)`。
+  3. `agent/created` / `agent/disposed` 要带 `{ global: true }` 才能跨 scope 收到；插件晚于 agent
+     加载时还要按 `agents.list()` 回溯补装，否则已有会话永远用不上。
+- **ObservationPack**：6143 B / 6531 B / 37694 B 三档输出被替换为 `obs_...` 句柄，原文落在
+  `~/.dsh/sol-pi/observation-pack/objects/`，ledger 记下 placeholder 与 recall；`obs_recall`
+  首页返回 `next_offset=15872 eof=false`，按偏移继续读能推进；关掉开关后同样的输出不再被替换。
+- **Action Fusion**（第 2 条修复后，连当前会话的 agent 也补装成功）：`edit + then_run` 成功路径返回
+  `[then_run:succeeded]` + 命令输出；命令非零退出返回 `[then_run:failed]` + `[exit code: N]` 且编辑保留；
+  `old_string` 不匹配时返回 `[then_run:skipped]`，命令未执行。工具体内嵌套 `ctx.tools.execute('pwsh')`
+  没有出现调度互等。
+- **验证边界**：Reducer 与 Context Compact 未实现；`obs_recall` 的“多页拼回逐字节相等”只在单测里验证，
+  真机只验证了分页推进与 eof。
