@@ -21,6 +21,57 @@ const MECHANISMS = Object.freeze({
 })
 
 /**
+ * 诊断工具：报告 Action Fusion 在各 agent 上的安装情况。
+ *
+ * 只在 `diagnostics: true` 时注册；用来回答“为什么模型没看到 then_run”这类问题——
+ * 是 agent/created 没到、是基线工具没拿到、还是 scoped 注册没生效。
+ */
+function createStatusTool(ctx, fusion) {
+  return {
+    name: 'sol_pi_status',
+    description: 'Report this plugin’s mechanism state (diagnostics only).',
+    parameters: { type: 'object', additionalProperties: false, properties: {} },
+    output: {
+      schema: { type: 'object', additionalProperties: true, properties: {} },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    async execute() {
+      const agents = (() => {
+        try {
+          return ctx.get?.('agents')?.list?.() ?? []
+        } catch {
+          return []
+        }
+      })()
+      const seen = []
+      for (const agent of agents) {
+        let editHasThenRun = false
+        let lookupError
+        try {
+          editHasThenRun = ctx.tools.get('edit', agent)?.parameters?.properties?.then_run !== undefined
+        } catch (error) {
+          lookupError = error instanceof Error ? error.message : String(error)
+        }
+        seen.push({
+          id: String(agent.id),
+          hasCtx: agent.ctx !== undefined,
+          editHasThenRun,
+          ...(lookupError === undefined ? {} : { lookupError }),
+        })
+      }
+      return {
+        actionFusion: {
+          config: fusion.config.actionFusion,
+          handles: fusion.installedAgents(),
+          state: fusion.state,
+        },
+        agents: seen,
+      }
+    },
+  }
+}
+
+/**
  * 装配入口。
  *
  * @param ctx - 插件上下文；所有注册都挂在它（或 agent scope）的 effect 名下。
@@ -29,14 +80,18 @@ const MECHANISMS = Object.freeze({
 export function apply(ctx, rawConfig) {
   const config = resolveConfig(rawConfig)
   const active = []
+  let fusion
 
   if (config.actionFusion) {
-    attachActionFusion(ctx, config)
+    fusion = attachActionFusion(ctx, config)
     active.push('actionFusion')
   }
   if (config.observationPack) {
     attachObservationPack(ctx, config)
     active.push('observationPack')
+  }
+  if (config.diagnostics && fusion !== undefined) {
+    ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion)))
   }
 
   if (active.length === 0) {
@@ -45,5 +100,3 @@ export function apply(ctx, rawConfig) {
   }
   ctx.logger?.info?.(`[sol-pi-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
 }
-
-export default apply

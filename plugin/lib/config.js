@@ -22,6 +22,8 @@ export const DEFAULT_CONFIG = Object.freeze({
   recallMaxLines: 400,
   /** 是否把每次 full/placeholder/recall 记到 ledger.jsonl（只记账，不进上下文）。 */
   ledger: true,
+  /** 诊断开关：注册一个 `sol_pi_status` 工具，报告 agent 安装状态与最近错误。 */
+  diagnostics: false,
 })
 
 const KNOWN_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -55,7 +57,7 @@ export function resolveConfig(raw) {
   const config = { ...DEFAULT_CONFIG, ...raw }
 
   if (config.version !== 1) fail(`不支持的 version ${JSON.stringify(config.version)}（只支持 1）`)
-  for (const key of ['actionFusion', 'observationPack', 'ledger']) {
+  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics']) {
     if (typeof config[key] !== 'boolean') fail(`${key} 必须是布尔值`)
   }
   positiveInteger('observationPackThresholdBytes', config.observationPackThresholdBytes, 1)
@@ -72,3 +74,4 @@ export function resolveConfig(raw) {
 
   return Object.freeze(config)
 }
+

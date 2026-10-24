@@ -53,3 +53,20 @@ profile 做真机验收，出现了单测替身覆盖不到的三类装配失败
 - 新用例「基线工具只挂在 agent scope 时也要装得上」：preset 层注册 `edit`、全局层为空，
   断言插件仍装上遮蔽版且带 `then_run`；全局视图保持 `undefined`，证明查的是 agent 视角；
 - 原有 14 项保持通过（合计 15 项）。
+
+## 落地
+
+- `plugin/lib/index.js`：只保留 `export function apply` / `export const inject` / `export const name`；
+  `diagnostics: true` 时注册 `sol_pi_status`（输出 `handles`、`state.created/attempts/skipped/errors`、
+  每个 agent 的 `hasCtx` 与 `editHasThenRun`）。
+- `plugin/lib/action-fusion.js`：
+  - 基线工具按 agent 视角取：`ctx.tools.get('edit', agent)` / `get('write', agent)`，shell 同理
+    （`createCommandRunner` 也按 `exec.agent` 查 `pwsh`/`bash`）；
+  - `agent/created`、`agent/disposed` 带 `{ global: true }`；
+  - 装配时 `agents.list()` 回溯补装；`handles` 以 agent id 去重，`tryInstall` 先立标再注册防重入；
+  - 安装尝试、跳过原因、异常都进 `state`，供 `sol_pi_status` 读取。
+- `plugin/lib/config.js`：新增 `diagnostics`（布尔，默认 `false`），参与严格校验。
+- 排障路径：`diagnostics: true` → 调 `sol_pi_status` → 看 `skipped.reason`（`no-agent-scope` /
+  `bases-not-found`）与 `errors[].phase`（`lookup` / `register` / `created` / `backfill`）。
+- 验证：`node tests/action-fusion.test.mjs` 15 项、`observation-pack` 12 项、`config` 5 项全绿；
+  真机装回后 `editHasThenRun` 对全部 live agent 为 `true`。

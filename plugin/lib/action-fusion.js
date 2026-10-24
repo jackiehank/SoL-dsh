@@ -184,9 +184,11 @@ export function createFusedDefinition({ name, base, runCommand, resolveFilePath 
  */
 export function createCommandRunner(ctx) {
   return async function runCommand(exec, thenRun) {
-    const shellName = ctx.tools.get('pwsh') !== undefined ? 'pwsh' : (ctx.tools.get('bash') !== undefined ? 'bash' : undefined)
+    // shell 工具与内建 edit/write 一样挂在 agent preset 的 scope 里，必须按该 agent 的视角取。
+    const scope = exec?.agent
+    const shellName = ctx.tools.get('pwsh', scope) !== undefined ? 'pwsh' : (ctx.tools.get('bash', scope) !== undefined ? 'bash' : undefined)
     if (shellName === undefined) throw new Error('no shell tool (pwsh/bash) is available to run then_run')
-    const definition = ctx.tools.get(shellName)
+    const definition = ctx.tools.get(shellName, scope)
     const properties = definition?.parameters?.properties ?? {}
     const args = {
       command: thenRun.command,
@@ -230,11 +232,24 @@ function resolveFilePathFactory(ctx) {
  */
 export function attachActionFusion(ctx, config) {
   const handles = new Map()
+  const state = { created: 0, attempts: 0, installed: 0, skipped: [], errors: [] }
+  const skippedKeys = new Set()
+  const recordSkip = (id, reason) => {
+    const token = `${id}:${reason}`
+    if (skippedKeys.has(token)) return
+    skippedKeys.add(token)
+    state.skipped.push({ id, reason })
+  }
 
   const installForAgent = (agent) => {
+    state.attempts += 1
     const scope = agent?.ctx
-    if (scope === undefined || scope.tools === undefined) return
+    if (scope === undefined || scope.tools === undefined) {
+      recordSkip(String(agent?.id), 'no-agent-scope')
+      return false
+    }
     const key = String(agent.id)
+    if (handles.has(key)) return true
     const runCommand = createCommandRunner(ctx)
     const resolveFilePath = resolveFilePathFactory(ctx)
 
@@ -248,12 +263,18 @@ export function attachActionFusion(ctx, config) {
         let baseEdit
         let baseWrite
         try {
-          baseEdit = ctx.tools.get('edit')
-          baseWrite = ctx.tools.get('write')
-        } catch {
+          // 内建 edit/write 由 agent preset 在各自的 scope 里注册，全局层没有它们；
+          // 必须按该 agent 的视角取基线，且要在注册遮蔽版之前取（否则拿到的是自己）。
+          baseEdit = ctx.tools.get('edit', agent)
+          baseWrite = ctx.tools.get('write', agent)
+        } catch (error) {
+          state.errors.push({ id: key, phase: 'lookup', message: errorText(error) })
           return false
         }
-        if (baseEdit === undefined && baseWrite === undefined) return false
+        if (baseEdit === undefined && baseWrite === undefined) {
+          recordSkip(key, 'bases-not-found')
+          return false
+        }
         // 先立标再注册：注册本身会触发 tools/change，若重入会重复注册同名工具。
         installed = true
         try {
@@ -265,6 +286,7 @@ export function attachActionFusion(ctx, config) {
           }
         } catch (error) {
           installed = false
+          state.errors.push({ id: key, phase: 'register', message: errorText(error) })
           throw error
         }
         changeOff?.()
@@ -274,7 +296,11 @@ export function attachActionFusion(ctx, config) {
 
       if (!tryInstall()) {
         changeOff = scope.on('tools/change', () => {
-          tryInstall()
+          try {
+            tryInstall()
+          } catch {
+            // 错误已经记进 state；保留监听器以便下一次工具变更重试。
+          }
         })
       }
 
@@ -292,27 +318,41 @@ export function attachActionFusion(ctx, config) {
     })
 
     handles.set(key, dispose)
+    state.installed = handles.size
+    return true
   }
 
   ctx.on('agent/created', ({ agent }) => {
+    state.created += 1
     try {
       installForAgent(agent)
     } catch (error) {
+      state.errors.push({ id: String(agent?.id), phase: 'created', message: errorText(error) })
       console.warn(`[sol-pi-dsh] action-fusion install failed: ${errorText(error)}`)
     }
-  })
+  }, { global: true })
 
   ctx.on('agent/disposed', ({ agent }) => {
     const key = String(agent?.id)
     const dispose = handles.get(key)
     if (dispose === undefined) return
     handles.delete(key)
+    state.installed = handles.size
     try {
       dispose()
     } catch {
       // agent 已经销毁；这里只是清账。
     }
-  })
+  }, { global: true })
+
+  // 插件晚于 agent 加载时（典型：热装、恢复会话）补装已有 agent，
+  // 否则它们会一直用没有 then_run 的内建 edit/write。
+  try {
+    for (const agent of ctx.get?.('agents')?.list?.() ?? []) installForAgent(agent)
+  } catch (error) {
+    state.errors.push({ id: '*', phase: 'backfill', message: errorText(error) })
+    console.warn(`[sol-pi-dsh] action-fusion backfill skipped: ${errorText(error)}`)
+  }
 
   // 插件卸载时把还活着的 agent 注册一起撤掉。
   ctx.effect(() => () => {
@@ -324,10 +364,14 @@ export function attachActionFusion(ctx, config) {
       }
     }
     handles.clear()
+    state.installed = 0
   })
 
   return {
     installedAgents: () => handles.size,
+    state,
+    installForAgent,
     config,
   }
 }
+
