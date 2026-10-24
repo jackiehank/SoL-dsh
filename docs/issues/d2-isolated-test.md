@@ -210,3 +210,19 @@ Electron application"*。所以不改 `~/.dsh/profiles/desktop/*`，而是走**�
 | `~/.dsh/profiles/desktop/cordis.patch.yml` | sha256 与快照一致 |
 | `~/.dsh/profiles/desktop/cordis.yml` | sha256 与快照一致 |
 | `sol-pi-dsh` 行配置 | 退回 bundle 默认（全关） |
+
+## 落地
+
+`enable-bundle/`（工作区 bundle）作为可复用的实验开关提交：patch 里覆盖 `compaction-basic` 为启用、
+并给出 `sol-pi-dsh` 的完整 compact 配置。用法：
+
+```powershell
+# 打开（需要 approval）
+plugin_manager install_bundle <仓库>/enable-bundle
+# 跑实验
+# 回滚
+plugin_manager remove_bundle @local/sol-pi-dsh-enable
+```
+
+注意：`compaction-basic` 只在这一行被覆盖时生效；`sol-pi-dsh` 的 config 是**覆盖式**的，
+因此 patch 里写全量键。回滚以 profile 文件 sha256 与快照一致为准（本次已验证）。

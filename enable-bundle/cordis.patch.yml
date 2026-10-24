@@ -1,0 +1,17 @@
+- id: compaction-basic
+  disabled: false
+- id: sol-pi-dsh
+  config:
+    version: 1
+    actionFusion: false
+    observationPack: false
+    evidencePreservingReducer: false
+    onlineContextCompact: true
+    compactKeepRecentTokens: 1500
+    compactSummaryTokens: 300
+    compactMinRequestsSinceLast: 0
+    compactFirstScale: 1
+    compactMargin: 1
+    storageRoot: ''
+    ledger: true
+    diagnostics: true

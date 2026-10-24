@@ -1,0 +1,8 @@
+{
+  "name": "@local/sol-pi-dsh-enable",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "实验开关：打开 compaction-basic 与 sol-pi-dsh 的 onlineContextCompact",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
