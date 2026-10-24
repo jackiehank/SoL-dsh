@@ -66,3 +66,22 @@ turn 里自动续跑；原生拒绝（太小/已压缩/摘要被截断）记录 
 - 装配（假 compaction/tokenMeter）：完成边界后的 pre-step 调一次 `compactRegion(1, 2, agent, signal)`，
   同一 turn 返回 `{kind:'enter'}`；没有新边界时不再调用；`compaction`/`tokenMeter` 缺失时不激活；
   `compactRegion` 抛错时 fail-open（返回 `{kind:'enter'}`）并记 `fallback` 账本。
+
+## 落地
+
+- `plugin/lib/compact.js`：`createPlanTracker`（content 作键的完成边界）、`decideCompaction`（保守经济性）、
+  `selectRange`（system 不入区间、按 `compactKeepRecentTokens` 留尾）、`attachOnlineContextCompact`
+  （观察 `todo_write`、数 `agent/request`、在 `agent/pre-step` 压缩一次）。
+- 配置：`onlineContextCompact`、`compactKeepRecentTokens`(20000)、`compactMinRequestsSinceLast`(2)、
+  `compactFirstScale`(2)、`compactMargin`(1.5)、`compactSummaryTokens`(1000)，全部参与严格校验。
+- 守卫：缺 `compaction`/`tokenMeter` 时只警告、不激活；区间选不出、经济性不成立、冷却中都不调用；
+  `compactRegion` 抛错、tokenMeter 异常一律 fail-open（照常 `next()`），原因写
+  `evidence-preserving-reducer/ledger.jsonl`（`scope=online-context-compact`）。
+- 已知边界：状态是进程内内存，会话 resume 后冷却/计数从头开始；`pressure` 参数暂未接
+  `session.requestContext().contextWindow`，窗口压力分支保留给后续迭代。
+
+## 已验证 / 未验证
+
+- 已验证：决策核心、装配路径、fail-open、无依赖时不激活（单测）。
+- 未验证：真实会话里的 `compactRegion` 调用（需要真实 turn、整 surface 稳定与一次摘要模型调用）；
+  端到端只能在打开开关后由使用中的会话观察，失败会按 fail-open 记录。

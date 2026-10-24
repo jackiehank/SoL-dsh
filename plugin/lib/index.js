@@ -9,6 +9,7 @@ import { resolveConfig } from './config.js'
 import { attachActionFusion } from './action-fusion.js'
 import { attachObservationPack } from './observation-pack.js'
 import { attachEvidencePreservingReducer } from './reducer.js'
+import { attachOnlineContextCompact } from './compact.js'
 
 /** Cordis 函数插件名；与包名一致，便于在日志和插件列表里对号入座。 */
 export const name = 'sol-pi-dsh'
@@ -20,6 +21,7 @@ const MECHANISMS = Object.freeze({
   actionFusion: 'Action Fusion（edit/write 的 then_run）',
   observationPack: 'ObservationPack（大结果句柄 + obs_recall）',
   evidencePreservingReducer: 'Evidence-Preserving Reducer（诊断日志回执）',
+  onlineContextCompact: 'Online Context Compact（计划完成点压缩）',
 })
 
 /**
@@ -102,6 +104,10 @@ export function apply(ctx, rawConfig) {
       active.push('evidencePreservingReducer')
     }
   }
+  if (config.onlineContextCompact) {
+    const compact = attachOnlineContextCompact(ctx, config)
+    if (compact !== undefined) active.push('onlineContextCompact')
+  }
   if (config.diagnostics && fusion !== undefined) {
     ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion, diagnosticsInfo)))
   }
@@ -112,5 +118,6 @@ export function apply(ctx, rawConfig) {
   }
   ctx.logger?.info?.(`[sol-pi-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
 }
+
 
 

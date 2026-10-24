@@ -33,6 +33,13 @@ export const DEFAULT_CONFIG = Object.freeze({
   reducerMaxChars: 600_000,
   reducerTimeoutMs: 90_000,
   reducerMaxOutputTokens: 2_048,
+  /** Online Context Compact：计划完成点触发原生压缩。 */
+  onlineContextCompact: false,
+  compactKeepRecentTokens: 20_000,
+  compactMinRequestsSinceLast: 2,
+  compactFirstScale: 2,
+  compactMargin: 1.5,
+  compactSummaryTokens: 1_000,
 })
 
 const KNOWN_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -66,9 +73,17 @@ export function resolveConfig(raw) {
   const config = { ...DEFAULT_CONFIG, ...raw }
 
   if (config.version !== 1) fail(`不支持的 version ${JSON.stringify(config.version)}（只支持 1）`)
-  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics', 'evidencePreservingReducer']) {
+  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics', 'evidencePreservingReducer', 'onlineContextCompact']) {
     if (typeof config[key] !== 'boolean') fail(`${key} 必须是布尔值`)
   }
+  for (const key of ['compactMargin', 'compactFirstScale']) {
+    if (typeof config[key] !== 'number' || !Number.isFinite(config[key]) || config[key] < 1) {
+      fail(`${key} 必须是 >= 1 的有限数`)
+    }
+  }
+  positiveInteger('compactKeepRecentTokens', config.compactKeepRecentTokens, 1)
+  positiveInteger('compactMinRequestsSinceLast', config.compactMinRequestsSinceLast, 0)
+  positiveInteger('compactSummaryTokens', config.compactSummaryTokens, 1)
   for (const key of ['reducerProvider', 'reducerModel']) {
     if (typeof config[key] !== 'string') fail(`${key} 必须是字符串`)
   }
@@ -90,5 +105,6 @@ export function resolveConfig(raw) {
 
   return Object.freeze(config)
 }
+
 
 

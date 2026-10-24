@@ -21,6 +21,12 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 | `reducerMaxChars` | `600000` | 超过该字符数的正文不归约（`source-over-max-chars`） |
 | `reducerTimeoutMs` | `90000` | 单次归约调用超时 |
 | `reducerMaxOutputTokens` | `2048` | 归约输出上限 |
+| `onlineContextCompact` | `false` | 计划步骤完成点触发原生压缩（同一 turn 继续） |
+| `compactKeepRecentTokens` | `20000` | 压缩区间之外保留的最近 token 数 |
+| `compactMinRequestsSinceLast` | `2` | 两次压缩之间至少隔多少个请求（冷却） |
+| `compactFirstScale` | `2` | 首次压缩的视界倍数 |
+| `compactMargin` | `1.5` | 非首次压缩的 breakeven 余量 |
+| `compactSummaryTokens` | `1000` | 摘要成本估计（经济性判断用） |
 
 未知键、类型错误、非法取值在插件装配阶段直接报错——不会“以为开了其实没开”。
 
@@ -42,6 +48,10 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
   出现在归档正文里，schema/source_sha256/status/证据条数/长度任何一项不符、失败日志缺 failure 证据、
   或回执不比原文小，都整体回退到原文。回执首行是 `sol_pi_evidence_receipt_v1`，带
   `source_artifact` 供按字节复核。
+- **Online Context Compact**：观察内建 `todo_write`，只有“旧步骤变 completed”才产生完成边界；
+  在 `agent/pre-step` 里用 `ctx.tokenMeter.measure(session).nodes` 选区间（system 不入区间、按
+  `compactKeepRecentTokens` 留尾），经济性成立才调 `ctx.compaction.compactRegion`——压缩后同一
+  turn 的下一 step 自然继续，不注入“继续工作”的消息。
 - **失败开放**：归档写失败、模型不可用/超时/输出不合法、监听器异常都保留原结果，只打
   `[sol-pi-dsh]` 警告，并在 `evidence-preserving-reducer/ledger.jsonl` 记下原因。
 
@@ -51,8 +61,9 @@ DSH 没有 Pi 的 `context` 投影层（`agent/request` 不能改消息），因
 落日志前替换，**没有“前两次发全文”这一档**；占位符第一次请求就生效。
 
 Reducer 在 DSH 上以 `[exit code: N]` 为准（`pwsh` 非零退出通常不算 `isError`），且看不到
-`then_run` 段——那一段由 `finalizeContent` 在 post-execute 之后才追加。Online Context Compact
-尚未移植，方案见 `docs/issues/online-context-compact-dsh.md`。
+`then_run` 段——那一段由 `finalizeContent` 在 post-execute 之后才追加。Compact 用
+`compactRegion` 而不是 Pi 的“注入续跑消息”，因此没有额外的模型往返；它的状态是进程内内存，
+resume 后冷却从头开始。
 
 ## 启用与回退
 
@@ -61,5 +72,6 @@ Reducer 在 DSH 上以 `[exit code: N]` 为准（`pwsh` 非零退出通常不算
 3. 回退 = 改回 `false` 并再次加载；拔插件后归档目录留在 `storageRoot`，可自行清理。
 
 归档是本地明文，可能含日志里的敏感内容；`storageRoot` 不要指向共享目录。
+
 
 

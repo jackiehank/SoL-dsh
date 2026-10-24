@@ -92,3 +92,9 @@ profile 重新加载。
 
 Reducer 已由 `evidence-preserving-reducer-dsh` 落地（归档 + 逐字校验 + 整体回退 + 账本），实现与
 配置见 `plugin/lib/reducer.js` 与 `plugin/README.md`。剩余未适配项只有 Online Context Compact。
+
+## 四个机制齐了
+
+Online Context Compact 已由 `online-context-compact-dsh` 落地。bundle 现在包含四个机制，
+默认全关；全部测试：action-fusion 15 + observation-pack 12 + config 5 + reducer 11 + compact 5。
+Compact 的端到端（真实补偿调用）尚未在真机验证，单测覆盖决策与 fail-open。
