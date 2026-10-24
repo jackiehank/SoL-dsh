@@ -112,3 +112,55 @@ Client 侧能读的数据：`ctx.sessions.retain(...)` 拿到 `SessionReference`
 4. **Reducer / Compact 的可见性已经够用**：回执正文自带 `sol_pi_evidence_receipt_v1` 头（含
    source/receipt 字节、条数），DSH 原生 compaction 有 `compaction` 节点；不需要额外做卡。
 
+### 更正（collect 第 1 条写错了）
+
+`createFusedDefinition` 其实**已经**转发表现层（`action-fusion.js:175-176`）：
+
+```js
+if (typeof base.presentCall === 'function') definition.presentCall = (args) => base.presentCall(args)
+if (typeof base.presentResult === 'function') definition.presentResult = (args, result) => base.presentResult(args, result)
+```
+
+所以熔合后的 edit/write 仍然显示原生 diff 卡与 follow-along 定位，没有退化。上一版结论是凭“遮蔽可能丢字段”
+推断的，没有对照当前代码；这里作废。真正的缺口只有两个：**没有徽标**、**`obs_recall` 没有 presenter**。
+
+## 设计（hypothesize）：三层，只做第一层
+
+| 层 | 手段 | 能显示什么 | 成本 | 决策 |
+| --- | --- | --- | --- | --- |
+| A. 工具表现层 | `presentCall` / `presentResult`（display-only，不进上下文） | 工具卡片的标题与正文排版 | 纯本地、零 token、无新入口 | **做** |
+| B. Client 插件 slot | `conversation.chat.turnTail` / `conversation.composer.dock` 等 | 每轮汇总、会话常驻条、侧栏图标 | 新 client bundle、跨机制计数要另建数据通道 | 暂不做（记入后续） |
+| C. 瞬时提示 | DSH 无服务端 toast；`workspace.toast` 的 key 是固定枚举 | 上游那种 4 秒状态行 | 只能靠 client 插件 + `shell.overlay` 自绘 | 不做 |
+
+A 层的两个改动：
+
+1. **Action Fusion**：`presentCall`/`presentResult` 在熔合且未失败时给 `title` 追加
+   `⚡ 融合 · 省 1 次模型往返`；无 `then_run`、或结果 `isError` 时原样透传原生视图。
+   只改 `title`，`card`/`diffs`/`content` 不动——diff 卡、终端卡、follow-along 全部保留。
+2. **ObservationPack**：给 `obs_recall` 补 `output.presentationMeta`（字节/行数/下一页）+
+   `presentCall`（在读哪个句柄）+ `presentResult`（标题 `obs_recall · 2.9 KiB · N 行（还有下一页）`，
+   正文末尾一行 `⚡ ObservationPack · 大观测以句柄代替原文，未整段重放`）。
+
+明确不做：
+
+- **不给 `pwsh`/`edit` 之外的机制加卡片**：Reducer 的回执正文已经是信息载体（源字节、回执字节、条数），
+  再包一层只是重复；Compact 用原生 compaction 节点。
+- **不做每步/每轮的常驻状态条**：DSH 里做这件事要 client 插件 + 一条新的 Host→Client 数据通道，
+  而收益（用户偶尔扫一眼）与升级风险不成比例；先看 A 层够不够。
+- **不改 `output.render`**：那是模型可见层，加一个字符都要按请求付费，与“展示”目的冲突。
+
+判定口径（怎么算这个 issue 做成了）：`then_run` 成功的 edit/write 卡片标题带徽标、失败的没有；
+`obs_recall` 卡片标题带可读字节数与行数；`node tests/*.test.mjs` 全绿且模型可见内容里不出现 ⚡ 或横幅。
+
+## 落地（apply）
+
+- `plugin/lib/action-fusion.js`：新增 `FUSION_BADGE`、`withBadge(view, badge)`、`wantsFusion(args)`；
+  `presentCall`/`presentResult` 改成“原生视图 + 条件徽标”，失败或没 `then_run` 时原样返回。
+- `plugin/lib/observation-pack.js`：新增 `OBSERVATION_PACK_BADGE`、`formatBytes(bytes)`；
+  `obs_recall` 的 `output` 增加 `presentationMeta`，工具定义增加 `presentCall`/`presentResult`。
+- 测试：`tests/action-fusion.test.mjs` +3（徽标条件、无 presenter 时不造卡、`withBadge` 边界），
+  `tests/observation-pack.test.mjs` +2（卡片标题/横幅、`formatBytes` 三档）；
+  断言里特意检查 `output.render` 的产物**不含** ⚡ 与横幅，防止展示层漏进模型上下文。
+- 全量：57 项测试通过（原 52 + 5）。
+
+
