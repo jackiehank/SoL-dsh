@@ -113,3 +113,28 @@
 4. **成本**：只给 token 与显式单价下的换算，不假装是账单。
 
 尚缺的证据：本 profile 的会话持久化位置与 `assistant/message.usage` 的 cache 分项是否存在——下一动作先定位再写采集脚本。
+
+## 小样本采集（只读，未花模型 token）
+
+`tools/measure-sessions.mjs`：解码 `~/.dsh/sessions/<workspace>/<session>/session.v4.jsonl.zstd`
+（按 zstd 魔数切帧，Node 只解第一帧），汇总 turn/step/工具调用/错误/分项 token/融合标记/占位符/压缩，
+并聚合 `~/.dsh/sol-pi/**/ledger.jsonl`。不做模型调用、不写文件。
+
+本工作区现有 4 个会话的输出：
+
+| session | turns | steps | calls | err | input | output | cacheR | total | fusion | pack | compact |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 521694f9（本会话，含真机冒烟） | 5 | 241 | 289 | 3 | 1,144,280 | 184,399 | 57,084,672 | 58,413,351 | 5/5 | 4 | 0 |
+| 1ec4fc50（compact 调研子代理） | 1 | 47 | 65 | 6 | 317,641 | 28,507 | 4,879,232 | 5,225,380 | 0/0 | 0 | 0 |
+| e2f58a16（reducer 调研子代理） | 1 | 17 | 29 | 0 | 86,063 | 16,455 | 768,640 | 871,158 | 1/1 | 0 | 0 |
+| 45e967fd（冒烟子代理） | 1 | 19 | 28 | 1 | 43,004 | 10,317 | 359,808 | 413,129 | 0/0 | 1 | 0 |
+
+账本：`observation-pack` `{placeholder: 4, recall: 3}`；`reducer` 空（机制从未真机打开）。
+
+读数时注意：
+
+- **cache read 占绝对多数**（57.1M / 58.4M）：任何“省 token”的结论必须分项，否则会被 cache read 淹没；
+- 本会话日志在持续写，数字是采集时刻的快照；`fusion 5/5` 来自本轮与冒烟脚本的真实 `then_run` 标记，
+  `pack 4` 与账本的 4 次 placeholder 对得上，可作交叉校验；
+- `todos` 计数为 0：事件类型不是 `todo/write`（或该会话没用 todo_write），采集器里这一列暂不可信；
+- `reducer` 无数据：不能据此判断它无效，只能说“未启用、未观测”。
