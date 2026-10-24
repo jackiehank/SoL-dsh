@@ -42,3 +42,12 @@ test('打开单个机制不影响其它键', () => {
   assert.equal(config.observationPack, false)
   assert.equal(config.ledger, true)
 })
+
+test('reducer 调优键：默认沿用适配器默认，非法值装配期报错', () => {
+  const spec = resolveConfig({})
+  assert.equal(spec.reducerReasoningEffort, '')
+  assert.equal(spec.reducerTemperature, null)
+  assert.equal(resolveConfig({ reducerReasoningEffort: 'high', reducerTemperature: 0 }).reducerTemperature, 0)
+  assert.throws(() => resolveConfig({ reducerTemperature: 3 }), /reducerTemperature/)
+  assert.throws(() => resolveConfig({ reducerReasoningEffort: 1 }), /reducerReasoningEffort/)
+})

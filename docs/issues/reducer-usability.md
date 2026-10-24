@@ -76,3 +76,31 @@ Reducer 的链路已通，但真机始终停在 `fallback: unverifiable-quote`�
 2. `plugin/lib/config.js`：新增 `reducerReasoningEffort`（可选字符串）、`reducerTemperature`
    （可选 0–2），非法值装配期报错；
 3. `enable-bundle` 增加 reducer 开关组，按 R0–R4 逐组跑，账本与 profile sha256 作为判据。
+
+## 真机结果（R3 / R4，默认路由）
+
+用 `enable-reducer` 开关开启（`evidencePreservingReducer: true`、`reducerReasoningEffort: high`、
+`reducerTemperature: 0`，其余机制全关），两条命令都由我在真实会话里触发：
+
+| 组 | fixture | 源大小 | 结果 | 回执模型 |
+| --- | --- | --- | --- | --- |
+| R3 | t5 真实形态日志（行长短不一） | 5,461 B / 132 行 | **applied**（3 条引文全部逐字校验） | deepseek-v4-pro（opencode-go，effort=high） |
+| R4 | t4 重复行日志（之前失败的那份） | 7,225 B / 96 行 | **applied**（3 条引文） | 同上 |
+
+两份回执都远小于原文（约 1.1 KB），`source_artifact` 指向归档原文，`readback` 行提示按区间复核。
+关键点：
+
+- **R4 也过了**，说明之前的 `unverifiable-quote` 主要不是 fixture 放大，而是没传 effort/温度、
+  提示词也没要求“短而唯一”的引文；
+- `reducer_model=deepseek-v4-pro` 说明默认路由在 `reasoningEffort=high` 下解析到了 pro 模型——
+  “调 thinking 等级”确实改变了实际执行的模型，这是它有效的直接证据；
+- 两次都一次通过，预置的“校验失败重试一次”没有被触发。
+
+## 回滚
+
+`remove_bundle @local/sol-pi-dsh-reducer-lab` → applied；desktop 的三个 profile 文件
+（`package.json`、`cordis.patch.yml`、`cordis.yml`）sha256 与快照**全部一致**。
+
+## 单测
+
+`tests/config.test.mjs` 6 项（新增调优键校验）、`tests/reducer.test.mjs` 12 项，全绿。
