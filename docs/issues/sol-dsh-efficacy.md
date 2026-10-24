@@ -382,3 +382,29 @@ H1′：同一长会话任务里，开启 ObsPack 后**后续请求对那条大�
 - 主会话：`tools/measure-sessions.mjs` 的 steps / input / cacheR / total、`compaction/*` 计数（待补列）；
 - 辅助调用：只从账本取（`applied.receiptBytes`、`sourceBytes`、`reducer_total_tokens`、`compacted.shadowedTokens`）；
 - 结论必须分开写“机制是否跑通”和“是否有净收益”；本轮**只承诺前者**。
+
+## 激进档 D1（Reducer）真机结果
+
+同一条本地合成命令 `python -m unittest discover -s .tmp/efficacy/t4`（输出 7,225 B、退出码 1，
+命中 `python -m unittest` 诊断规则）跑了三轮，每一轮都被 fail-open 接住：
+
+| 轮次 | 账本结果 | 根因 | 处理 |
+| --- | --- | --- | --- |
+| 1 | `fallback: exception` — prepared LLM call config changed | `prepareCall` 未带 `maxTokens`、`stream` 带了 | 两处一致 |
+| 2 | `fallback: exception` — `400 MissingSessionID` | 归约调用没带 `sessionId`（opencode-go 要求） | 传 `exec.agent.id` |
+| 3 | `candidate`(7225 B) → `provider_response`(3,825 tokens) → `fallback: unverifiable-quote` | 模型（deepseek-v4.1-flash）的输出无法提供逐字连续引文 | 按设计拒绝，**不放宽校验** |
+
+结论：
+
+- **链路已通**：候选识别、内容寻址归档、受限模型调用、回执校验四段都真实执行了；
+  前两个装配缺陷已由 `reducer-live-defects` 修复并复测。
+- **未达成 `applied`**：当前模型路由产不出可验证回执，机制按设计保留原文。这不是“机制无效”，
+  而是“验证器发现模型不可靠”；要拿到 `applied`，需要换更强的归约模型（`reducerProvider/reducerModel`）
+  或改进提示，不改校验规则。
+- 原始日志逐字节保留，插件对主会话没有产生任何内容替换。
+- 配置已恢复全关并重装；D1 只使用本地合成日志，未外发业务数据。
+
+## D2（Compact）状态
+
+**未执行**。本轮在 Reducer 的排障上耗尽了预算；D2 需要真实完整会话与一次摘要调用，
+留待下一轮按已提交的 D2 方案执行（todo 完成边界 → `agent/pre-step` compactRegion → 同 turn 继续）。
