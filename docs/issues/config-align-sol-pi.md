@@ -81,3 +81,23 @@ reducer provider/model 可省略→内置路由；**未知键、版本不符、�
 2. 实验调优（compact 五个参数、reducer effort/温度）：放进独立 `labs` 配置块、走环境变量，
    还是实验时直接 patch 常量？
 3. 旧键兼容：直接报错并提示新键名，还是一次性别名过渡？
+
+## 方案（hypothesize）
+
+按你的决定，对外配置**严格等于上游 8 键**：
+
+1. **保留 8 键**：`version`、`actionFusion`、`observationPack`、`evidencePreservingReducer`、
+   `evidencePreservingReducerProvider`、`evidencePreservingReducerModel`、`onlineContextCompact`、
+   `cacheWriteReadRatio`（命名与上游一致）。
+2. **阈值全部硬编码**：10 KiB 打包、16 KiB/400 行召回、4096 B/600k 字符/90s/2048 token 归约、
+   compact 的 20k 保留尾部/冷却 2/首次×2/余量 1.5/摘要 1000 —— 与上游同款内部默认。
+3. **DSH 特有走环境变量**：`DSH_SOL_PI_HOME`（归档根目录）、`DSH_SOL_PI_DIAGNOSTICS=1`（排障工具）；
+   `ledger` 常开、删键。
+4. **实验用常量**：测试与实验直接复制 `resolveConfig()` 的冻结结果再覆盖字段（`{ ...cfg, reducerMinBytes: 16 }`），
+   不再为实验保留配置键。
+5. **旧键直接报错**：错误信息列出可用的 8 个键与环境变量，不做别名过渡。
+
+风险与已知代价：
+
+- 之前文档里的调优键（`reducerTemperature`、compact 五参数等）不再可配；想改只能改代码或测试里覆盖常量；
+- `cacheWriteReadRatio` 目前只为兼容保留并校验，**不参与决策**（我们的 economics 尚未用它），README 明说。
