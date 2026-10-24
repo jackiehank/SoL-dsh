@@ -43,3 +43,21 @@
 4. 全关时行为与未安装一致（`tools/change` 无额外工具、无 post-execute 改写）；
 5. `node --test tests` 全绿，覆盖上面每个机制的正例与反例；
 6. `kiln check` 通过，`kiln path <issue>` 能重放每个决策。
+
+## 当前交付范围
+
+- 已适配并落地：**Action Fusion**（`plugin/lib/action-fusion.js`）与
+  **ObservationPack**（`plugin/lib/observation-pack.js` + `plugin/lib/store.js`），
+  对应 issue `action-fusion-dsh`、`observation-pack-dsh`。
+- 未适配（各自的 issue 另行开题，本文件不预写结论）：
+  **Evidence-Preserving Reducer** 与 **Online Context Compact**。已核对的 DSH 抓手：
+  - reducer：`tools/post-execute` + `ctx.llm` 受限调用（provider/model 由配置给），回执需对
+    `ctx.toolResultPruner` 豁免；引用必须逐字匹配归档，失败保留原文。
+  - compact：复用内建 `todo_write`（不另造计划工具），在 `agent/pre-step` 里调
+    `ctx.compaction.compactRegion` 可做到“同一 turn 下一 step 用压缩后的 surface 继续”，
+    比注入续跑消息更干净；状态应放 `ctx.sessionProjections`，不写会话日志。
+- bundle 骨架：`plugin/package.json` + `plugin/cordis.patch.yml`（一行插入，四个开关默认关）+
+  `plugin/locale/{en,zh}.json` + `plugin/icon.svg`；`lib/index.js` 只做装配，配置非法在装配阶段报错。
+- 测试：`tests/{config,observation-pack,action-fusion}.test.mjs`，31 项通过；测试替身
+  `tests/helpers.mjs` 只模拟本插件用到的契约（工具分层/tool 管线/finalizeContent），
+  真实管线行为仍需装到 profile 后验证。

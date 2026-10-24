@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SoL-Pi Efficiency Pack",
+    "description": "Opt-in mechanisms ported from NVlabs/SoL-Pi: fused edit/write follow-up commands, and archived large tool results with exact paged recall. Every mechanism is disabled by default."
+  }
+}
