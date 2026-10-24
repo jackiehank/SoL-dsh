@@ -88,3 +88,28 @@
 4. 允许并展示**负结果**：分数下降、某机制不触发、cache write 上升都写进结论。
 
 下载与引用：<https://arxiv.org/abs/2609.20519>（HTML: <https://arxiv.org/html/2609.20519v1>）。
+
+## DSH 侧能观测到什么（已核对的服务与文件）
+
+| 可观测量 | 来源 | 取法 | 已知偏差 |
+| --- | --- | --- | --- |
+| 总 token / surface token / 按节点 token | `ctx.tokenMeter`（`measure(session, header?)`、`estimateMessage`） | 插件内查；`nodes[{seq,tokens}]` 给区间定价 | 是“路由定价”的估计；跨模型切换后不可直接比 |
+| 单条消息的 token | `estimateMessage` | 同上 | 粗估，非 provider 计数 |
+| 输入/输出/cache 读/cache 写 | `assistant/message.usage`（`session/event` 流） | 折叠日志或读持久化投影 | DSH 是否记录 cache 分项取决于 provider；本会话未验证到分项 |
+| 模型往返 / step / 工具调用数 | `agent/turn-stopping`、`tools/result`、`agent/request` | 事件计数 | 并行工具调用会一次 dispatch 内多次 `tools/result` |
+| 压缩收益 | `ctx.compaction.compactRegion` 返回的 `shadowedTokenCount`（另有 `summary`/`shadowedRange`） | 插件内记账 | 只反映被 shadow 的区间，不等于实际省下的请求成本 |
+| Action Fusion 触发次数 | `then_run` 标记（`[then_run:succeeded|failed]`）出现在工具结果里 | 扫日志/`tools/result` | 失败也计数，要分开统计 |
+| ObservationPack 替换与召回 | 插件账本 `~/.dsh/sol-pi/observation-pack/ledger.jsonl`（本会话已验证有 `placeholder`/`recall` 记录，含 `removedTokens`） | 直接读 JSONL | 只在开启时产生；不含原始内容 |
+| Reducer 生效/回退 | `~/.dsh/sol-pi/evidence-preserving-reducer/ledger.jsonl`（`candidate`/`applied`/`fallback`/`compacted`） | 直接读 JSONL | 原因分类有限；不含正文 |
+| Compact 跳过/失败 | 同上，`scope=online-context-compact` | 直接读 JSONL | 只在开启时产生 |
+| 会话原始记录 | 本 profile 只观察到 `~/.dsh/storages/.../session_projcache`；**没有找到** JSONL 会话文件 | 待下一条 collect 定位持久化后端（或改用服务读取） | 位置未确认，不能作为第一版数据源 |
+| 成本（$） | 无现成服务 | 用 token × 单价表现算（单价写在脚本参数里） | 价格随时间和 provider 变；必须注明价格快照 |
+
+可用的近似口径（第一版）：
+
+1. **token**：直接报 tokenMeter 的 `totalTokens`；有 usage 事件时以 provider 上报为准，并注明是否含 cache；
+2. **往返**：`tools/result` 计数 + turn/step 计数；Action Fusion 的节省按“融合调用数”估算被省掉的往返；
+3. **正确性**：任务自带断言（脚本退出码/测试通过），不用模型自述；
+4. **成本**：只给 token 与显式单价下的换算，不假装是账单。
+
+尚缺的证据：本 profile 的会话持久化位置与 `assistant/message.usage` 的 cache 分项是否存在——下一动作先定位再写采集脚本。
