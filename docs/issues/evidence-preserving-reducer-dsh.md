@@ -65,3 +65,16 @@ cmake/ninja/make/npm|pnpm|yarn test/go test/bazel test 等）的长输出上工�
    Reducer 在 post-execute 里只能看到编辑结果本身，因此本版本只归约 `pwsh`/`bash` 的整段输出。
 3. `terminal_send` 的输出是增量流、且没有可靠的命令文本，先不纳入候选。
 4. 归档根与 ObservationPack 共用 `storageRoot`，但目录限定为 `evidence-preserving-reducer/objects/<sha[0:2]>/`。
+
+## 校验矩阵与结果
+
+`tests/reducer.test.mjs`（11 项，全绿）：
+
+- 正例：跨行引文、CJK/emoji、首行/末行引文 → 通过，行号按首个匹配位置计算，`quote_sha256` 与原文一致；
+- 元数据负例：非 JSON、schema 不符、source_sha256 不符、status 与退出状态相反、uncertain 非布尔、
+  evidence 非数组、13 条、数组根 → 各自命中 `invalid-json` / `schema-mismatch`；
+- 逐字负例：改一个空格、改大小写、多一个尾随空格、把跨行引文拆回单行、空引文、601 字符、
+  未知 kind、NFC/NFD 变体 → 一律 `unverifiable-quote`；
+- 失败语义：失败日志只有 summary 证据 → `missing-failure-evidence`；重复 `(kind,quote)` 只保留首条；
+- 机制级（假 llm）：可校验回执替换 content、原文按哈希落盘、账本记录 candidate/applied；
+  引文不匹配、finish=error、非诊断命令、正文过小、疑似密钥、嵌套调用、回执比原文大 → 全部保留原文。
