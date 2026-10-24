@@ -247,3 +247,53 @@ B1−B0 = 调用 **−1**、steps **−1**、total **−18.7%**、cacheR −26.7
   表里用的是重跑数据；
 - `todos` 列仍恒 0（事件名未对上），本轮的 Compact 相关列不可用；
 - 结论只覆盖“保守档在短任务上的可测性”，不能外推论文的 44–49% token 降幅。
+
+## ObservationPack 长会话实验（hypothesize）
+
+### 为什么换任务
+
+短任务里 A1−A0 的 total 只差 −0.2%：大结果只被 1 个 turn 内的少数请求重放，且模型为了核对末行多花一次
+`obs_recall`。ObsPack 的设计场景是**一次大观测进入上下文后，被后续很多次 provider 请求反复重放**。
+所以实验必须让“大结果 → 后续 ≥8 次请求”这一段真实发生。
+
+### 假设
+
+H1′：同一长会话任务里，开启 ObsPack 后**后续请求对那条大观测的重放成本（以 cache read 为主）显著下降**，
+总 token 下降，且任务正确性不变。若模型必须读取大结果中段，则必须显式 `obs_recall`，该成本单独计入。
+
+### 任务 T3（一次大读 + 8 个独立后续步骤）
+
+- 素材：`.tmp/efficacy/t3/data.json`（约 80 KB，400 条记录）。
+  - 第 7 条含 `"needed": "VALUE=7K9"`，文件最后一行 `TRAILER=OK-42`
+    —— 这两个值都落在占位符的首/尾摘录里，**不需要 recall**，把“召回成本”从主比较里排除；
+  - 另建 `.tmp/efficacy/t3/parts/p1..p8.txt`（8 个小文件）。
+- 指令：① 用一次 `Get-Content -Raw` 读完整 `data.json`，报出 `VALUE` 与 `TRAILER`；
+  ② 然后**逐个文件、单独命令**计算 `p1..p8` 的 SHA256（明确要求不要合并成一条命令、不要用循环）；
+  ③ 最后一次性给出 10 个值。上限 14 次工具调用。
+- 正确性：10 个值全部精确匹配（VALUE、TRAILER、8 个 sha256），由外部脚本核对，不看模型自述。
+
+### 对照与计量
+
+| 组 | 配置 | 任务 | 关键量 |
+| --- | --- | --- | --- |
+| C0 | 全关 | T3 | 基线 |
+| C1 | 只开 observationPack | T3 | 处理组 |
+
+每格 **1 次**，同模型、同推理强度、同沙箱。需要采集的量（现采集器已覆盖大部分）：
+
+- `cacheReadTokens`（主指标：重放成本主要落在这里）、`inputTokens`、`totalTokens`；
+- `toolCalls`、`steps`、`request/header` 次数（需给采集器加一列 `requests`）；
+- `observationPlaceholders`、`obs_recall` 次数（从账本 `recall` 计数取）；
+- 正确性：10 个值是否全对。
+
+**预先声明的判定**：C1 的 `cacheReadTokens ≤ 0.85 × C0` 且 `totalTokens ≤ 0.90 × C0` 且正确性全对
+→ 记为“支持 H1′”；任一条不满足或正确性失败 → “未支持”，照实记录。`obs_recall` 若 >0，
+把该次召回的 token 也计入 C1 成本（不做事后剔除）。
+
+### 成本与风险
+
+- 预估两格各 10–14 次请求；单格 token 量明显大于 T1/T2，合计是上一轮 A/B 的数倍——**跑之前先确认预算**；
+- 仍需两次 bundle 切换（OFF→ON→OFF），不花模型 token，但会短暂影响本会话；
+- 风险：模型可能把 8 个 sha256 合并成一条命令（则请求数不足，实验作废，需重跑并明确“一次一个文件”）；
+  或模型只在占位符里看到 VALUE/TRAILER 就结束（正确性仍可判，重放次数变少，效应变弱）；
+- 采集缺口：`requests` 计数与 `obs_recall` 关联需要先补进 `tools/measure-sessions.mjs`（纯本地改动）。
