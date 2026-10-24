@@ -62,3 +62,35 @@ D2（Online Context Compact 真机验证）卡在环境上：desktop profile 没
 1. headless 的 launch-time credential 具体从哪读（环境变量名 / settings）；
 2. `dsh --profile <lab> --dump-config` 里是否有 `compaction` 与 `token-meter`；
 3. 把本地目录 bundle 装进 lab profile 的命令形式（`dsh plugin --profile lab add <绝对路径>`）。
+
+## 方案 A 首次尝试：搭起来了，但卡在两处
+
+已完成的隔离搭建（全部在 `.tmp`，未触碰 desktop）：
+
+1. `DSH_HOME=.tmp/dsh-lab`，用 `dsh --profile solpi-lab --from-default-profile headless` 生成了独立 profile；
+2. `--dump-config` 确认组合里**确实有** `token-meter`、`compaction-basic`、
+   `compaction-tool-result-pruner`、`compaction-image-offload`，以及 `headless-runner`；
+3. 把 `plugin/` 复制进 lab profile 的 `node_modules/@local/sol-pi-dsh`，用一层
+   `--patch .tmp/lab-overlay.yml` 插入插件并打开 `onlineContextCompact`；
+   `--dump-config` 能看到 `id: sol-pi-dsh / onlineContextCompact: true`。
+
+跑一条最小任务时暴露两个阻断：
+
+- **凭据**：headless 用“launch environment → `<cwd>/.env` → `$DSH_HOME/.env`”的路线，
+  桌面里保存的登录被忽略。当前环境没有 `DEEPSEEK_API_KEY`，直接
+  `MISSING_CREDENTIAL: llm-deepseek … provider route "deepseek-official"`。
+- **插件看不到 compaction 服务**：启动日志出现
+  `[sol-pi-dsh] onlineContextCompact 已开启，但缺少 compaction/tokenMeter；本机制保持关闭`，
+  尽管 dump-config 里有 `compaction-basic`。说明 `attachOnlineContextCompact` 在 `apply()` 时
+  用 `ctx.get('compaction')` 取服务太早（服务尚未就绪/未声明 inject）。正确做法是
+  `ctx.inject(['compaction', 'tokenMeter'], …)` 让激活等待依赖，而不是一次性的 `ctx.get`。
+
+### 下一步（二选一）
+
+- **A1（真实）**：在 lab 的 `.env` 或启动环境提供 `DEEPSEEK_API_KEY`（或换一个可用的 API-key 路由），
+  先修 `ctx.inject` 的激活时序，再跑真实 D2；
+- **A2（零凭据）**：在 lab overlay 里加一个假 `compaction` 服务桩（只实现 `compactRegion`，
+  记录参数并返回 `shadowedTokenCount`），验证“完成边界 → 区间选择 → 调用 → 账本 → 同 turn 继续”，
+  不花模型 token、不外发日志。
+
+两种都需要先把 `ctx.inject` 时序修掉——这是本轮发现的真实缺陷，与凭据无关。
