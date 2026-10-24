@@ -40,3 +40,51 @@
 3. 至少跑一轮小样本 A/B（例如 3 个任务 × 2 组 × 2 次），给出方向性结论与置信度说明；
 4. 结论里必须包含“没有效果/负效果”的可能性与判据，而不是只挑有利数字；
 5. 所有动作继续走 kiln（collect → test → conclude/apply）。
+
+## 论文怎么证明有效性（arXiv:2609.20519v1，2026-09-17）
+
+### 评测面与对照
+
+- **任务集**：EdgeBench（51 个公开任务；11 个用于一次性验收，40 个留作最终泛化评估）、
+  Terminal-Bench 4（63 个纯 CPU 任务）、IMO 2026（Lean 4 形式化验收）、kernel-optimization 多代理实验。
+- **对照**：Codex、OpenSquilla、Oh-My-Pi、OpenCode、Oh-My-OpenCode、Pi（主基线）、EdgeBench 官方分数；
+  另有 **Opus 5 作为留出后端**，验证“不改代码、跨模型迁移”。
+- **纪律**：能力容差与效率指标在搜索前固定、与优化 agent 隔离；候选必须先过能力门、再过效率门；
+  留出结果不回灌搜索；评测前冻结机制源码、配置、指标与接受规则。
+
+### 指标（可直接借用）
+
+| 指标 | 定义 | 论文里的用法 |
+| --- | --- | --- |
+| Recorded token traffic | 分 Input / Cache Read / Cache Write / Output / Total（十亿 token） | 主效率指标，单列 cache 读/写 |
+| Token cost | 按固定日期（2026-08-17）API 价格折算的美元 | 主成本指标 |
+| Avg. score | EdgeBench 任务平均分 | 能力指标（不是通过率） |
+| Token efficiency | API cost ÷ 聚合任务分数（$/score） | 单一“性价比”数字 |
+| Solved tasks / cost per solved | Terminal-Bench 的通过数与“每解一题成本” | 迁移评测 |
+| Trigger rate / intensity | 机制在多少比例任务上触发 / 每个触发任务平均触发几次 | 机制激活画像，解释增益来源 |
+
+### 关键数字（GPT-5.6 Sol，EdgeBench 51 任务）
+
+| 配置 | Total tokens | Token cost | Avg score | $/score |
+| --- | --- | --- | --- | --- |
+| Pi | 2.1538 B | $1,339 | 44.833 | 0.5855 |
+| SoL-Pi [Efficiency]（四机制全开） | 1.0990 B | $894 | 42.003 | 0.4174 |
+| SoL-Pi [Performance]（只开 ObservationPack） | 2.0224 B | $1,271 | 47.208 | 0.5280 |
+
+- 全开：token −49.0%、成本 −33.2%，保留 Pi 93.7% 的平均分；Opus 5 留出后端 token −44.7%、成本 −33.5%、
+  保留 94.3% 平均分。
+- 单机制消融（GPT-5.6 Sol / Opus 5）：四个机制**单独加**都能降 token；但分数有涨有跌
+  （如 Opus 5 + Action Fusion 50.482 vs Pi 44.756，而 GPT-5.6 Sol + Online Context Compact 41.993 vs 44.833）。
+- Cache 权衡：全开时 cache read 2.1326 B → 1.0605 B，cache write 0.0141 B → 0.0316 B，总成本仍降。
+- 不利结果也照报：Terminal-Bench 4 上 SoL-Pi 解 15 题、Pi 解 18 题（总成本 −26.3%、每解题成本 −11.6%）；
+  IMO 2026 通过 3/6，与 Pi 持平但每通过题成本更低（$20.90 vs $25.32）。
+
+### 对我们的含义
+
+1. 度量必须**分项**：input / cache read / cache write / output，否则压缩机制“省 input、涨 cache write”的
+   权衡会被掩盖；总成本与 token efficiency 要同时报。
+2. 必须有**能力门**：只看 token 下降没有意义；至少要有一个自带断言的正确性代理（测试通过率/任务分）。
+3. 归因要**逐机制**：论文先报单机制、再报全栈，并附触发率/触发强度；我们本地也要“全关 / 单开 / 全开”三档。
+4. 允许并展示**负结果**：分数下降、某机制不触发、cache write 上升都写进结论。
+
+下载与引用：<https://arxiv.org/abs/2609.20519>（HTML: <https://arxiv.org/html/2609.20519v1>）。
