@@ -69,3 +69,18 @@
    再 `install_bundle plugin/`，并核对 profile 文件状态。
 
 已知代价：设置过旧环境变量的用户需要改变量名；旧行配置不会随包名迁移（本插件默认全关，影响很小）。
+
+## 落地
+
+- 改名 20 个文件：`plugin/package.json`（`@local/sol-dsh`）、`plugin/cordis.patch.yml`（行 id `sol-dsh`、
+  环境变量注释）、`plugin/lib/{index,config,action-fusion,compact,reducer,observation-pack}.js`
+  （插件名、日志/错误前缀、`sol_dsh_status`、`DSH_SOL_DSH_HOME`/`DSH_SOL_DSH_DIAGNOSTICS`）、
+  `plugin/locale/{en,zh}.json`、`plugin/README.md`、根 `README.md`、`AGENTS.md`、
+  三个 `enable-*/` 实验 bundle、`tests/config.test.mjs`（环境变量断言）。
+- **未改**：`sol_pi_evidence_receipt_v1`（协议常量）、`docs/issues/*.md`（历史）、README 里的
+  `NVlabs/SoL-Pi` 与回执文本 `authority=Sol retains …`（上游引用）。
+- 核对：排除 `docs/issues/` 后，全仓已无 `sol-pi-dsh` / `sol_pi_status` / `DSH_SOL_PI` 残留。
+- 测试：52 项全绿（config 8、compact 5、reducer 12、observation-pack 12、action-fusion 15）。
+- 重装：`remove_bundle @local/sol-pi-dsh` → `install_bundle plugin/`，结果
+  `bundle: @local/sol-dsh@0.2.0, application: applied`；profile 的 `package.json` 依赖项变为
+  `@local/sol-dsh`（预期变化），用户 patch 层 `cordis.patch.yml` 与 `cordis.yml` 哈希不变。

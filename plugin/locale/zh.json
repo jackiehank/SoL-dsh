@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "SoL-Pi 效率包",
+    "title": "SoL-dsh 效率包",
     "description": "从 NVlabs/SoL-Pi 移植的可选效率机制：编辑/写入后同一调用内跑后续命令；超大工具结果归档并用句柄精确分页召回。四个机制默认全部关闭。"
   }
 }

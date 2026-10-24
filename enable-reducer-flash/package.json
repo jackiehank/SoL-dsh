@@ -1,5 +1,5 @@
 {
-  "name": "@local/sol-pi-dsh-reducer-flash",
+  "name": "@local/sol-dsh-reducer-flash",
   "version": "0.0.1",
   "private": true,
   "type": "module",

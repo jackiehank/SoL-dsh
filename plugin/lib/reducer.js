@@ -429,7 +429,7 @@ export function resolveReducerRoute(ctx, config) {
 export function attachEvidencePreservingReducer(ctx, config) {
   const route = resolveReducerRoute(ctx, config)
   if (route === undefined) {
-    console.warn('[sol-pi-dsh] evidencePreservingReducer 已开启，但拿不到 reducer provider/model；本机制保持关闭')
+    console.warn('[sol-dsh] evidencePreservingReducer 已开启，但拿不到 reducer provider/model；本机制保持关闭')
     return undefined
   }
   const archive = createArchive(config.storageRoot)

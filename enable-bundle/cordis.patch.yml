@@ -1,6 +1,6 @@
 - id: compaction-basic
   disabled: false
-- id: sol-pi-dsh
+- id: sol-dsh
   config:
     version: 1
     actionFusion: false

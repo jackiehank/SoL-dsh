@@ -328,7 +328,7 @@ export function attachActionFusion(ctx, config) {
       installForAgent(agent)
     } catch (error) {
       state.errors.push({ id: String(agent?.id), phase: 'created', message: errorText(error) })
-      console.warn(`[sol-pi-dsh] action-fusion install failed: ${errorText(error)}`)
+      console.warn(`[sol-dsh] action-fusion install failed: ${errorText(error)}`)
     }
   }, { global: true })
 
@@ -351,7 +351,7 @@ export function attachActionFusion(ctx, config) {
     for (const agent of ctx.get?.('agents')?.list?.() ?? []) installForAgent(agent)
   } catch (error) {
     state.errors.push({ id: '*', phase: 'backfill', message: errorText(error) })
-    console.warn(`[sol-pi-dsh] action-fusion backfill skipped: ${errorText(error)}`)
+    console.warn(`[sol-dsh] action-fusion backfill skipped: ${errorText(error)}`)
   }
 
   // 插件卸载时把还活着的 agent 注册一起撤掉。

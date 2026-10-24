@@ -1,9 +1,9 @@
 {
-  "name": "@local/sol-pi-dsh",
+  "name": "@local/sol-dsh",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "SoL-Pi 的 DSH 移植：Action Fusion 与 ObservationPack（默认关闭）",
+  "description": "SoL-Pi 四个效率机制在 DSH 上的移植（默认全关）",
   "license": "MIT",
   "exports": {
     ".": "./lib/index.js",
@@ -22,5 +22,6 @@
     }
   }
 }
+
 
 

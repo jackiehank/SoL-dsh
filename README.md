@@ -31,7 +31,7 @@ node tests/action-fusion.test.mjs
 
 ## 排障
 
-打开 `diagnostics: true` 后多一个 `sol_pi_status` 工具，报告每个 agent 的 `editHasThenRun`
+打开 `diagnostics: true` 后多一个 `sol_dsh_status` 工具，报告每个 agent 的 `editHasThenRun`
 与安装失败阶段（`no-agent-scope` / `bases-not-found` / `register` / `backfill`）。
 
 ## 仓库约定

@@ -155,7 +155,7 @@ export function createPostExecuteHandler({ store, thresholdBytes = DEFAULT_THRES
     } catch (error) {
       // fail-open：打包失败绝不吞掉观测。
       const reason = error instanceof Error ? error.message : String(error)
-      console.warn(`[sol-pi-dsh] observation-pack fail-open: ${reason}`)
+      console.warn(`[sol-dsh] observation-pack fail-open: ${reason}`)
       return decision
     }
   }

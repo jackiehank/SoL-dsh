@@ -4,8 +4,8 @@
  * 与上游 sol-pi 对齐：对外只暴露 8 个键（`version`、四个机制开关、归约 provider/model、
  * `cacheWriteReadRatio`）。其余阈值全部取上游同款硬编码默认；DSH 特有的两件事走环境变量：
  *
- * - `DSH_SOL_PI_HOME`：归档根目录（默认 `<DSH_HOME>/sol-pi`）；
- * - `DSH_SOL_PI_DIAGNOSTICS=1`：注册 `sol_pi_status` 排障工具。
+ * - `DSH_SOL_DSH_HOME`：归档根目录（默认 `<DSH_HOME>/sol-pi`）；
+ * - `DSH_SOL_DSH_DIAGNOSTICS=1`：注册 `sol_dsh_status` 排障工具。
  *
  * 未知键、类型错误、非法值都在装配阶段直接报错，不做静默降级。
  */
@@ -61,7 +61,7 @@ export const INTERNAL_DEFAULTS = Object.freeze({
 const KNOWN_KEYS = new Set(PUBLIC_KEYS)
 
 function fail(message) {
-  throw new Error(`sol-pi-dsh 配置错误：${message}`)
+  throw new Error(`sol-dsh 配置错误：${message}`)
 }
 
 function dshHome() {
@@ -75,9 +75,9 @@ function envFlag(name) {
   return value === '1' || value === 'true'
 }
 
-/** 归档根目录：`DSH_SOL_PI_HOME` 优先，否则 `<DSH_HOME>/sol-pi`。 */
+/** 归档根目录：`DSH_SOL_DSH_HOME` 优先，否则 `<DSH_HOME>/sol-pi`。 */
 export function resolveStorageRoot() {
-  const configured = process.env.DSH_SOL_PI_HOME
+  const configured = process.env.DSH_SOL_DSH_HOME
   if (configured !== undefined && configured.trim().length > 0) return configured
   return join(dshHome(), 'sol-pi')
 }
@@ -94,7 +94,7 @@ export function resolveConfig(raw) {
 
   for (const key of Object.keys(raw)) {
     if (!KNOWN_KEYS.has(key)) {
-      fail(`未知配置键 "${key}"（只支持：${PUBLIC_KEYS.join(', ')}；阈值不可配，DSH 目录/排障用环境变量 DSH_SOL_PI_HOME / DSH_SOL_PI_DIAGNOSTICS）`)
+      fail(`未知配置键 "${key}"（只支持：${PUBLIC_KEYS.join(', ')}；阈值不可配，DSH 目录/排障用环境变量 DSH_SOL_DSH_HOME / DSH_SOL_DSH_DIAGNOSTICS）`)
     }
   }
 
@@ -119,6 +119,6 @@ export function resolveConfig(raw) {
     reducerModel: config.evidencePreservingReducerModel,
     storageRoot: resolveStorageRoot(),
     ledger: true,
-    diagnostics: envFlag('DSH_SOL_PI_DIAGNOSTICS'),
+    diagnostics: envFlag('DSH_SOL_DSH_DIAGNOSTICS'),
   })
 }

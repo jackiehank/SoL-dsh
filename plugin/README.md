@@ -1,4 +1,4 @@
-# @local/sol-pi-dsh
+# @local/sol-dsh
 
 SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 bundle，
 零外部依赖，四个机制默认全关。**配置键与上游 `sol-pi.json` 一致**，只有 8 个。
@@ -23,8 +23,8 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 
 | 变量 | 默认 | 作用 |
 | --- | --- | --- |
-| `DSH_SOL_PI_HOME` | `<DSH_HOME>/sol-pi` | 归档根目录（目录 0700、对象 0600、明文日志） |
-| `DSH_SOL_PI_DIAGNOSTICS=1` | 关 | 注册 `sol_pi_status`，报告 Action Fusion 的 per-agent 安装情况（排障用） |
+| `DSH_SOL_DSH_HOME` | `<DSH_HOME>/sol-pi` | 归档根目录（目录 0700、对象 0600、明文日志） |
+| `DSH_SOL_DSH_DIAGNOSTICS=1` | 关 | 注册 `sol_dsh_status`，报告 Action Fusion 的 per-agent 安装情况（排障用） |
 
 ## 行为要点
 
@@ -49,7 +49,7 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
   内部默认 20k token 留尾），经济性成立才调 `ctx.compaction.compactRegion`——压缩后同一
   turn 的下一 step 自然继续，不注入“继续工作”的消息。
 - **失败开放**：归档写失败、模型不可用/超时/输出不合法、监听器异常都保留原结果，只打
-  `[sol-pi-dsh]` 警告，并在 `evidence-preserving-reducer/ledger.jsonl` 记下原因（账本常开、KB 级）。
+  `[sol-dsh]` 警告，并在 `evidence-preserving-reducer/ledger.jsonl` 记下原因（账本常开、KB 级）。
 
 ## 与上游的差异
 
@@ -69,4 +69,4 @@ resume 后冷却从头开始。
 2. 让 profile 重新加载插件（`plugin_manager` 重新安装，或重启 Harness）；
 3. 回退 = 改回 `false` 并再次加载；拔插件后归档目录留在 `storageRoot`，可自行清理。
 
-归档是本地明文，可能含日志里的敏感内容；`DSH_SOL_PI_HOME` 不要指向共享目录。
+归档是本地明文，可能含日志里的敏感内容；`DSH_SOL_DSH_HOME` 不要指向共享目录。

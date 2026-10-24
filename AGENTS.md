@@ -70,7 +70,7 @@ kiln commit <issue> apply --title "<落地了什么、怎么验证>" --target pl
 ## 5. 项目结构
 
 ```text
-plugin/                    @local/sol-pi-dsh：DSH bundle（Host 半）
+plugin/                    @local/sol-dsh：DSH bundle（Host 半）
   package.json             dsh.bundle.patch 指向 cordis.patch.yml
   cordis.patch.yml         插入插件行 + 默认配置（四个机制全关）
   lib/index.js             apply(ctx, config)：装配四个机制

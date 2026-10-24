@@ -12,7 +12,7 @@ import { attachEvidencePreservingReducer } from './reducer.js'
 import { attachOnlineContextCompact } from './compact.js'
 
 /** Cordis 函数插件名；与包名一致，便于在日志和插件列表里对号入座。 */
-export const name = 'sol-pi-dsh'
+export const name = 'sol-dsh'
 
 /** 依赖工具注册表；没有 tools 服务的 profile 里本插件保持不激活。 */
 export const inject = ['tools']
@@ -32,7 +32,7 @@ const MECHANISMS = Object.freeze({
  */
 function createStatusTool(ctx, fusion, diagnosticsInfo) {
   return {
-    name: 'sol_pi_status',
+    name: 'sol_dsh_status',
     description: 'Report this plugin’s mechanism state (diagnostics only).',
     parameters: { type: 'object', additionalProperties: false, properties: {} },
     output: {
@@ -114,10 +114,10 @@ export function apply(ctx, rawConfig) {
   }
 
   if (active.length === 0) {
-    ctx.logger?.info?.('[sol-pi-dsh] 四个机制均未开启（opt-in），不注册任何扩展')
+    ctx.logger?.info?.('[sol-dsh] 四个机制均未开启（opt-in），不注册任何扩展')
     return
   }
-  ctx.logger?.info?.(`[sol-pi-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
+  ctx.logger?.info?.(`[sol-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
 }
 
 

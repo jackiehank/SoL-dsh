@@ -124,7 +124,7 @@ export function attachOnlineContextCompact(ctx, config) {
   const compaction = ctx.get?.('compaction')
   const tokenMeter = ctx.get?.('tokenMeter')
   if (compaction === undefined || typeof compaction.compactRegion !== 'function' || tokenMeter === undefined) {
-    console.warn('[sol-pi-dsh] onlineContextCompact 已开启，但缺少 compaction/tokenMeter；本机制保持关闭')
+    console.warn('[sol-dsh] onlineContextCompact 已开启，但缺少 compaction/tokenMeter；本机制保持关闭')
     return undefined
   }
 
