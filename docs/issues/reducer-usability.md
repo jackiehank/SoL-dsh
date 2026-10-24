@@ -38,3 +38,32 @@ Reducer 的链路已通，但真机始终停在 `fallback: unverifiable-quote`�
    `candidate → provider_response → applied`，且 `receiptBytes < sourceBytes`；
 3. 同一配置在 D1 的重复行 fixture 上若仍失败，账本明确记录 `unverifiable-quote`，原文逐字节保留；
 4. 所有对照仍走 enable-bundle 开关，`remove_bundle` 即恢复，profile 文件 sha256 不变。
+
+## Collect：当前实现与上游差在哪
+
+- **我们的调用**（`plugin/lib/reducer.js` → `callReducer`）：
+  `llm.prepareCall({ provider, model, maxTokens })` → `prepared.stream({ provider, model, system, messages, maxTokens, signal, sessionId })`。
+  **没有 reasoningEffort、没有 temperature**，全部吃适配器默认值；失败后只记录原因，不重试。
+- **上游**：论文 §2.5 明确 reducer 用 “GPT-5.6 Luna at high”；说明它把**思考等级显式拉高**，
+  而不是依赖默认。它的提示词还限定了“≤12 条、每条 ≤600 字符、必须逐字”，但**没有**要求“短引用”。
+- **DSH 的类型面**：`LlmCallConfig` 与 `GenerateOptions` 都支持 `reasoningEffort`；
+  `LlmCallControls` 支持 `temperature`。两者的共同约束是：**prepareCall 与 stream 的 config 必须一致**，
+  否则会复现 D1 的 `prepared LLM call config changed before adapter dispatch`。
+- **证据**：D1 账本 `provider_response`（3,825–3,950 tokens、输出 530–902 B）说明模型确实在产出
+  JSON，失败点在引文字符级一致性；`invalid-json` 已用剥围栏解决，剩下的只有内容保真。
+- **默认路由**：本会话请求头是 `provider=opencode-go, model=deepseek-v4.1-flash, reasoningEffort=high`，
+  即默认路由本身支持 high；我们没有把它传给 reducer 调用。
+
+## Hypothesize：对照矩阵（一次只改一项）
+
+| 组 | reducerReasoningEffort | reducerTemperature | 提示词 | fixture | 预期 |
+| --- | --- | --- | --- | --- | --- |
+| R0 | 不传（现状） | 不传 | v1 | 真实形态 | 基线 |
+| R1 | high | 不传 | v1 | 真实形态 | 提升照抄稳定性 |
+| R2 | high | 0 | v1 | 真实形态 | 去随机性 |
+| R3 | high | 0 | v2（≤200 字符、最短唯一行、禁省略号/拼接） | 真实形态 | 最可能 applied |
+| R4 | high | 0 | v2 | 重复行（D1） | 验证是否 fixture 放大失败 |
+
+判定：账本出现 `applied` 且 `receiptBytes < sourceBytes`；失败必须仍是 `unverifiable-quote` 且原文不变。
+执行仍用 `enable-bundle` 开关（开 reducer、关 compact），每轮 `remove_bundle` 回滚并核对 profile sha256。
+成本：R0–R3 各一次归约调用（约 4k 输入 + ≤2k 输出），R4 一次；总额可控。
