@@ -68,20 +68,20 @@ test('reducer provider/model 用上游长键名，内部映射到短名', () => 
   assert.equal(config.reducerModel, 'deepseek-v4.1-flash')
 })
 
-test('storageRoot 走 DSH_SOL_PI_HOME，否则 <DSH_HOME>/sol-pi', () => {
-  withEnv({ DSH_SOL_PI_HOME: 'D:/tmp/solpi', DSH_HOME: 'D:/tmp/home' }, () => {
+test('storageRoot 走 DSH_SOL_DSH_HOME，否则 <DSH_HOME>/sol-pi', () => {
+  withEnv({ DSH_SOL_DSH_HOME: 'D:/tmp/solpi', DSH_HOME: 'D:/tmp/home' }, () => {
     assert.equal(resolveConfig({}).storageRoot, 'D:/tmp/solpi')
   })
-  withEnv({ DSH_SOL_PI_HOME: undefined, DSH_HOME: 'D:/tmp/home' }, () => {
+  withEnv({ DSH_SOL_DSH_HOME: undefined, DSH_HOME: 'D:/tmp/home' }, () => {
     assert.equal(resolveConfig({}).storageRoot, join('D:/tmp/home', 'sol-pi'))
   })
 })
 
 test('diagnostics 只由环境变量开启', () => {
-  withEnv({ DSH_SOL_PI_DIAGNOSTICS: undefined }, () => {
+  withEnv({ DSH_SOL_DSH_DIAGNOSTICS: undefined }, () => {
     assert.equal(resolveConfig({}).diagnostics, false)
   })
-  withEnv({ DSH_SOL_PI_DIAGNOSTICS: '1' }, () => {
+  withEnv({ DSH_SOL_DSH_DIAGNOSTICS: '1' }, () => {
     assert.equal(resolveConfig({}).diagnostics, true)
   })
 })
