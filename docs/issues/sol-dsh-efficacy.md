@@ -408,3 +408,22 @@ H1′：同一长会话任务里，开启 ObsPack 后**后续请求对那条大�
 
 **未执行**。本轮在 Reducer 的排障上耗尽了预算；D2 需要真实完整会话与一次摘要调用，
 留待下一轮按已提交的 D2 方案执行（todo 完成边界 → `agent/pre-step` compactRegion → 同 turn 继续）。
+
+## 结论（本 issue 收口）
+
+1. **可观测量成立**：用 `~/.dsh/sessions/**/session.v4.jsonl.zstd`（多帧 zstd）+ 两份插件账本，
+   可以稳定拿到分项 token、step/tool 调用、机制触发计数；`tools/measure-sessions.mjs` 是只读入口，
+   `tools/make-t3-fixtures.mjs` 保证素材可复现。cache read 占总 token 的九成以上，必须分项报。
+2. **Action Fusion（保守）**：短任务里工具调用 5→4、steps 5→4，`then_run` 真触发，正确性不变
+   （n=1，方向性证据）。
+3. **ObservationPack（保守）**：短任务（1 turn）total 持平（−0.2%）；14 step 长会话里
+   cache read 435,200→258,304（−40.6%）、total −40.0%，正确性全对。机制价值取决于“大结果是否被
+   后续请求反复重放”，短任务上不应期待收益。
+4. **Reducer（激进）**：链路（候选→归档→模型调用→校验）已跑通；当前模型路由无法产出逐字引文，
+   验证器按设计拒绝并保留原文（fail-closed）。真机暴露的四个缺陷已在 `reducer-live-defects` 修复。
+5. **Compact（激进）**：完成边界与 14 step 会话行为正常，但本 profile 未挂载 compaction 后端
+   （`ctx.compaction` 不可用），插件按设计不激活；端到端需先启用 `compaction-basic`。监听器 scope
+   缺陷已修（global）。
+
+所有结论均为 **n=1** 的方向性证据，没有置信区间；不能外推论文的 44–49% 降幅。
+配置已恢复四个开关全关并重装。
