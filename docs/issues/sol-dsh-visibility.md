@@ -163,4 +163,30 @@ A 层的两个改动：
   断言里特意检查 `output.render` 的产物**不含** ⚡ 与横幅，防止展示层漏进模型上下文。
 - 全量：57 项测试通过（原 52 + 5）。
 
+## 结论：上游那套“横幅 + 4 秒状态行”，在 DSH 里对应的是工具表现层
+
+1. **上游的事实**：只有 `tui.ts` 两个出口——`renderSolPiTool` 把原生工具卡包成
+   `⚡ SoL-Pi · <机制>` + `Money saved · <节省量>` 两行；`showSolPiSavings` 发一条 toast 并把
+   `⚡ <机制> · <节省量>` 写进状态行，4 秒后自动清掉。全部是 TUI 渲染层，**不进模型上下文**，
+   非 TUI 模式（`mode !== "tui"`）直接静默。
+2. **DSH 的对应层**：`ToolDefinition.presentCall` / `presentResult` / `output.presentationMeta` 是
+   display-only 的渲染意图（`ToolCallView` / `ToolResultView`），模型看不到、不按 token 付费；
+   `output.render` 则是模型可见层，不能在它上面加展示文案。Client slot（`tool.call.toolview`、
+   `conversation.chat.turnTail`、`conversation.composer.dock` 等）能做得更多，但需要 client 插件，
+   且对已存在的工具名是“覆盖内置卡片”，没有上游那种“包一层”的 API。
+3. **落地**：只做表现层——融合的 `edit`/`write` 卡片标题追加 `⚡ 融合 · 省 1 次模型往返`
+   （`then_run` 成功才显示），`obs_recall` 有了自己的卡片标题（字节 / 行数 / 是否有下一页）与
+   `⚡ ObservationPack` 横幅；两者都只改 display-only 字段，`card`、`diffs`、`content` 与模型可见文本不变。
+4. **不做**：瞬时 toast / 状态行（DSH 没有服务端 toast，`workspace.toast` 的 key 是固定枚举）、
+   每轮或常驻状态条（需要 client 插件 + 新的 Host→Client 数据通道）、以及给 Reducer/Compact 加卡
+   （回执正文与原生 `compaction` 节点已经承载信息）。
+5. **验证状态**：单测 57 项全绿，其中专门断言 `output.render` 的产物不含 ⚡ 与横幅。
+   **未做真机 UI 验证**：四个机制当前全关，且 `@local/sol-dsh` 是 `link:` 安装——宿主进程要重载
+   插件才会用上新代码。要看效果，打开 `actionFusion`（带 `then_run` 的 edit）或 `observationPack`
+   （`obs_recall`），重载后卡片标题应带徽标；失败 / 无 `then_run` 的调用不应出现徽标。
+6. **后续可选**：若确实需要“本轮省了什么”的汇总，下一个入口是 client 插件的
+   `conversation.chat.turnTail`（additive，不覆盖内置卡），数据可以从会话里的占位符 / 回执 /
+   `compaction` 节点折算，不需要新的 Host 通道。
+
+
 
