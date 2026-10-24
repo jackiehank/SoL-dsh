@@ -50,3 +50,17 @@ DSH 侧的现实：
 - 小结果、错误结果、reducer 回执不被改写；
 - 归档目录不可写时 fail-open（本次结果仍是原文）；
 - `node --test tests` 覆盖：阈值边界、占位符首尾完整行、UTF-8 截断、并写同 id 校验、幂等。
+
+## 落地
+
+- 入口：`plugin/lib/observation-pack.js`（`attachObservationPack` 注册 `obs_recall` 并挂 `tools/post-execute`），
+  归档与分页在 `plugin/lib/store.js`；配置键见 `plugin/lib/config.js`。
+- 替换时机：监听器先 `await next()`，只在 accept 且没有 `value` 替换时改写 `content`；
+  错误结果、非文本块、已带 `sol_pi_evidence_receipt_v1` 的回执一律不动。
+- 归档：`<storageRoot>/observation-pack/objects/<obs_id>.txt`，`O_EXCL` 写入、已存在逐字节校验；
+  账本 `<storageRoot>/observation-pack/ledger.jsonl`。默认 `storageRoot = <DSH_HOME>/sol-pi`。
+- 与上游的差异：没有“前两次发全文”这一档（DSH 无投影层），占位符第一次请求就生效；
+  占位符首行改成 `replaced before it entered the context`，其余字段与召回格式保持上游形状。
+- 失败开放：归档写失败只 `console.warn`，监听器返回原决定（测试用不可写路径覆盖）。
+- 验证：`node tests/observation-pack.test.mjs` 12 项通过，覆盖阈值边界、首尾完整行、
+  原文逐字节回读（含 CJK/emoji 的 UTF-8 边界）、未知/越界 id、归档同 id 异内容、fail-open。
