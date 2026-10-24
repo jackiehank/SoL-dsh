@@ -41,3 +41,17 @@ turn 里自动续跑；原生拒绝（太小/已压缩/摘要被截断）记录 
 4. busy、too-small、`changed-span` 失败：不压缩、不续跑，冷却生效；
 5. 用户取消不续跑；resume 后冷却与债务从 session projection 重建；
 6. 缺 compaction/tokenMeter/sessionProjections 的 profile 里不激活。
+
+## 上游事实与 DSH 对照
+
+- Pi 的边界：只有“上一次快照里同 id 且未完成 → 本次 completed”才算完成边界；新引入的 completed 只算历史。
+- Pi 的经济性：saving=archive−memo；breakeven=newDebt/saving；horizon=1+floor(下界×剩余步数×scale)；
+  首次压缩视界 ×2；非首次还要过 ×1.5 margin；`saving≤0` 恒不压；窗口压力可越过经济性与冷却。
+- Pi 的续跑：压缩成功后注入一条 hidden 消息并 `triggerTurn`，在新 turn 继续。
+- DSH 的压缩入口：`ctx.compaction.compactRegion(start, end, agent, signal)`，要求 turn 打开且
+  whole-surface 稳定（可在 `agent/pre-step` 调用）；成功后**同一 turn 的下一 step 自然继续**，
+  不需要注入消息。`compactIfNeeded` 只按阈值、`compactNow` 要求 idle，都不适合边界驱动。
+- DSH 的计价：`ctx.tokenMeter.measure(session)` 给 `nodes[{seq,tokens}]`，区间选择与收益定价都用它；
+  节点 0 是 system/message，永不入区间。
+- DSH 的计划：复用内建 `todo_write`（观察参数，不另造工具）；todo 没有 id，以 `content` 作稳定键，
+  content 被改写按新步骤处理（只会少压，不会错压）。
