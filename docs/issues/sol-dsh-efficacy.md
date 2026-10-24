@@ -138,3 +138,29 @@
   `pack 4` 与账本的 4 次 placeholder 对得上，可作交叉校验；
 - `todos` 计数为 0：事件类型不是 `todo/write`（或该会话没用 todo_write），采集器里这一列暂不可信；
 - `reducer` 无数据：不能据此判断它无效，只能说“未启用、未观测”。
+
+## 上游的两档推荐（collect）
+
+README 原文把四个开关分成两档：
+
+1. **保守档（只开两个本地机制）**：`actionFusion: true` + `observationPack: true`。
+   原文理由：*"enables only the two local mechanisms that make no additional model calls and do not stop
+   an active run"* —— 不新增模型调用，也不打断正在进行的运行。
+2. **激进档（另外两个）**：`evidencePreservingReducer` + `onlineContextCompact`。README 要求
+   *"Enable additional mechanisms only after reviewing their configuration and security implications."*
+   `SECURITY.md` 写明了两条具体风险：
+   - Reducer：把符合条件的长日志通过配置的 reducer 模型发出去（Pi 管理的鉴权）；`likely-secret`
+     只是启发式，不是完整密钥扫描器；对“日志必须留在本机”的工作负载不应开启。
+   - Compact：计划与压缩状态写进会话日志，含路径、命令名、设计笔记，敏感度等同对话本身；
+     压缩成功后会写一条隐藏的通用消息让助手重建计划。
+
+映射到本仓（DSH）：
+
+| 档位 | 机制 | DSH 侧开销 / 风险 |
+| --- | --- | --- |
+| 保守 | Action Fusion | 本地；命令走 `pwsh` 的同一条审批/沙箱管线（可能弹审批，不新增模型调用） |
+| 保守 | ObservationPack | 本地；在结果落日志前替换 content（不新增模型调用，不可逆地少发原文，但可 `obs_recall`） |
+| 激进 | Evidence-Preserving Reducer | 每次候选日志触发一次 `ctx.llm` 调用（成本 + 日志出机 + 需要配 provider/model） |
+| 激进 | Online Context Compact | 在 `agent/pre-step` 触发一次压缩/摘要调用，改变后续 surface，影响正在进行的运行 |
+
+结论：实验顺序应与上游推荐一致——先在保守档拿信号，再决定是否为激进档花成本。
