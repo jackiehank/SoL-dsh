@@ -24,6 +24,15 @@ export const DEFAULT_CONFIG = Object.freeze({
   ledger: true,
   /** 诊断开关：注册一个 `sol_pi_status` 工具，报告 agent 安装状态与最近错误。 */
   diagnostics: false,
+  /** Evidence-Preserving Reducer：把诊断日志压成逐字可校验的回执。 */
+  evidencePreservingReducer: false,
+  /** 归约用的 provider/model；留空则用 agentDefaultModel 的当前选择。 */
+  reducerProvider: '',
+  reducerModel: '',
+  reducerMinBytes: 4096,
+  reducerMaxChars: 600_000,
+  reducerTimeoutMs: 90_000,
+  reducerMaxOutputTokens: 2_048,
 })
 
 const KNOWN_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -57,9 +66,16 @@ export function resolveConfig(raw) {
   const config = { ...DEFAULT_CONFIG, ...raw }
 
   if (config.version !== 1) fail(`不支持的 version ${JSON.stringify(config.version)}（只支持 1）`)
-  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics']) {
+  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics', 'evidencePreservingReducer']) {
     if (typeof config[key] !== 'boolean') fail(`${key} 必须是布尔值`)
   }
+  for (const key of ['reducerProvider', 'reducerModel']) {
+    if (typeof config[key] !== 'string') fail(`${key} 必须是字符串`)
+  }
+  positiveInteger('reducerMinBytes', config.reducerMinBytes, 1)
+  positiveInteger('reducerMaxChars', config.reducerMaxChars, config.reducerMinBytes)
+  positiveInteger('reducerTimeoutMs', config.reducerTimeoutMs, 1_000)
+  positiveInteger('reducerMaxOutputTokens', config.reducerMaxOutputTokens, 64)
   positiveInteger('observationPackThresholdBytes', config.observationPackThresholdBytes, 1)
   // 头部要留出 512 字节给 id/尺寸/召回指引，正文预算必须为正。
   positiveInteger('recallMaxBytes', config.recallMaxBytes, 1024)
@@ -74,4 +90,5 @@ export function resolveConfig(raw) {
 
   return Object.freeze(config)
 }
+
 

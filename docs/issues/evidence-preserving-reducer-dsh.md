@@ -78,3 +78,18 @@ cmake/ninja/make/npm|pnpm|yarn test/go test/bazel test 等）的长输出上工�
 - 失败语义：失败日志只有 summary 证据 → `missing-failure-evidence`；重复 `(kind,quote)` 只保留首条；
 - 机制级（假 llm）：可校验回执替换 content、原文按哈希落盘、账本记录 candidate/applied；
   引文不匹配、finish=error、非诊断命令、正文过小、疑似密钥、嵌套调用、回执比原文大 → 全部保留原文。
+
+## 落地
+
+- `plugin/lib/reducer.js`：候选识别（`pwsh`/`bash`，`[exit code: N]` 为准，嵌套跳过）、内容寻址归档
+  （`<storageRoot>/evidence-preserving-reducer/objects/<sha[0:2]>/<sha>.txt`，`O_EXCL` 写入 + 已存在逐字节校验）、
+  回执指令/输入/校验/渲染、受限 `ctx.llm` 调用（`prepareCall` + `stream`，90s 超时，只认 `finish.kind==='stop'`）、
+  `tools/post-execute` 监听与账本。
+- `plugin/lib/index.js`：注册顺序为 ObservationPack → Reducer（前者先 `next()`，Reducer 才能拿到原始长日志；
+  回执足够小，前者不会再打包）；`diagnostics` 的 `sol_pi_status` 附带归约路由。
+- `plugin/lib/config.js`：新增 `evidencePreservingReducer`、`reducerProvider`、`reducerModel`、
+  `reducerMinBytes`、`reducerMaxChars`、`reducerTimeoutMs`、`reducerMaxOutputTokens`，全部参与严格校验。
+- 路由：配置优先；留空时取 `agentDefaultModel.currentSelection()`。两者都拿不到时只警告并让机制保持关闭。
+- 回退原因都会落 `evidence-preserving-reducer/ledger.jsonl`（`candidate` / `provider_response` / `applied` /
+  `fallback`），正文与回执都不进账本。
+- 验证：`node tests/reducer.test.mjs` 11 项全绿；其余三套 5 + 12 + 15 项保持通过。

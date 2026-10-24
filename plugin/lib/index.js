@@ -8,6 +8,7 @@
 import { resolveConfig } from './config.js'
 import { attachActionFusion } from './action-fusion.js'
 import { attachObservationPack } from './observation-pack.js'
+import { attachEvidencePreservingReducer } from './reducer.js'
 
 /** Cordis 函数插件名；与包名一致，便于在日志和插件列表里对号入座。 */
 export const name = 'sol-pi-dsh'
@@ -18,6 +19,7 @@ export const inject = ['tools']
 const MECHANISMS = Object.freeze({
   actionFusion: 'Action Fusion（edit/write 的 then_run）',
   observationPack: 'ObservationPack（大结果句柄 + obs_recall）',
+  evidencePreservingReducer: 'Evidence-Preserving Reducer（诊断日志回执）',
 })
 
 /**
@@ -26,7 +28,7 @@ const MECHANISMS = Object.freeze({
  * 只在 `diagnostics: true` 时注册；用来回答“为什么模型没看到 then_run”这类问题——
  * 是 agent/created 没到、是基线工具没拿到、还是 scoped 注册没生效。
  */
-function createStatusTool(ctx, fusion) {
+function createStatusTool(ctx, fusion, diagnosticsInfo) {
   return {
     name: 'sol_pi_status',
     description: 'Report this plugin’s mechanism state (diagnostics only).',
@@ -64,6 +66,7 @@ function createStatusTool(ctx, fusion) {
           config: fusion.config.actionFusion,
           handles: fusion.installedAgents(),
           state: fusion.state,
+          ...diagnosticsInfo,
         },
         agents: seen,
       }
@@ -90,8 +93,17 @@ export function apply(ctx, rawConfig) {
     attachObservationPack(ctx, config)
     active.push('observationPack')
   }
+  // 顺序有意：ObservationPack 在前（它先 next()），Reducer 在后才能看到原始长日志，
+  // 并把回执交回给 ObservationPack 判断“是否还需要打包”。
+  if (config.evidencePreservingReducer) {
+    const reducer = attachEvidencePreservingReducer(ctx, config)
+    if (reducer !== undefined) {
+      diagnosticsInfo.reducer = { provider: reducer.route.provider, model: reducer.route.model }
+      active.push('evidencePreservingReducer')
+    }
+  }
   if (config.diagnostics && fusion !== undefined) {
-    ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion)))
+    ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion, diagnosticsInfo)))
   }
 
   if (active.length === 0) {
@@ -100,3 +112,5 @@ export function apply(ctx, rawConfig) {
   }
   ctx.logger?.info?.(`[sol-pi-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
 }
+
+
