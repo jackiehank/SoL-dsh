@@ -1,5 +1,5 @@
 # SoL-Pi 的 DSH 移植：四个机制都默认关闭，按需打开。
-# 打开某个机制 = 改这一行的 config；不想用了改回 false 并重启（或让 HMR 生效）。
+# 打开某个机制 = 改这一行的 config，然后让 profile 重新加载（插件重装或重启 Harness）。
 - insert:
     - id: sol-pi-dsh
       name: '@local/sol-pi-dsh'
@@ -16,3 +16,5 @@
         recallMaxBytes: 16384
         recallMaxLines: 400
         ledger: true
+        # 排障用：注册 sol_pi_status，报告各 agent 的 then_run 安装情况。
+        diagnostics: false

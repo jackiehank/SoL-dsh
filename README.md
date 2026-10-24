@@ -28,8 +28,14 @@ node tests/action-fusion.test.mjs
 
 测试用 `node --test tests` 会在本机沙箱里因 spawn 管道受限失败，直接按文件跑即可。
 
+## 排障
+
+打开 `diagnostics: true` 后多一个 `sol_pi_status` 工具，报告每个 agent 的 `editHasThenRun`
+与安装失败阶段（`no-agent-scope` / `bases-not-found` / `register` / `backfill`）。
+
 ## 仓库约定
 
 - issue 全部由 **kiln** 管理（`kiln status` / `kiln path <issue>`），见 [`AGENTS.md`](AGENTS.md)；
 - 插件包零外部依赖（只用 Node 内置模块），配置在 bundle 的 patch 行里；
 - 每个机制的取舍与差异写在 `docs/issues/<issue>.md`，不写状态。
+

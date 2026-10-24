@@ -80,3 +80,10 @@
   没有出现调度互等。
 - **验证边界**：Reducer 与 Context Compact 未实现；`obs_recall` 的“多页拼回逐字节相等”只在单测里验证，
   真机只验证了分页推进与 eof。
+
+## 收尾
+
+真机验收中发现的三类装配缺陷（inject 被 default 导出掩盖、基线工具在 agent scope、生命周期事件
+要 global）单开为 issue `plugin-assembly`，修复与回归都在那条 issue 里。bundle 最终以 `0.1.1`
+装进 desktop profile，两个机制回到默认关闭；再打开只需改 `plugin/cordis.patch.yml` 的布尔值并让
+profile 重新加载。
