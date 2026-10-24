@@ -94,3 +94,21 @@ D2（Online Context Compact 真机验证）卡在环境上：desktop profile 没
   不花模型 token、不外发日志。
 
 两种都需要先把 `ctx.inject` 时序修掉——这是本轮发现的真实缺陷，与凭据无关。
+
+## A1 复测（2026-10-24 晚）
+
+- 用 `ctx.inject(['compaction','tokenMeter'], …)` 改激活时序后，headless 启动**仍然**打印
+  “缺少 compaction/tokenMeter”。关键事实：`--dump-config` 里 `compaction-basic` 与 `token-meter`
+  两行都在、无 `disabled`；inject 回调确实执行了（否则不会走到 attach 的告警），但回调里
+  `ctx.get('compaction')` 仍读不到服务——根因未定位，下一步需要打印 inject 回调拿到的服务表 /
+  检查 compaction-basic 是否在依赖就绪前失败（它可能还依赖 settings/session）。
+- 凭据仍是硬阻断：headless 忽略桌面登录，`MISSING_CREDENTIAL: … deepseek-official`；
+  仓库与进程环境里都没有 `DEEPSEEK_API_KEY`，凭据文件里也没有可搬运的明文键。
+
+### 结论
+
+方案 A 的**隔离壳子已经可用**（lab profile、overlay、dump-config 全部打通），剩下两件事：
+1. 提供 `DEEPSEEK_API_KEY`（lab `.env` 或启动环境）——需要你给；
+2. 定位 compaction 服务在注入后仍读不到的原因（下一动作：打印注入上下文的可用服务键）。
+
+代码改动（`ctx.inject` 时序）暂未提交，先保留在工作区，等验证通过再落。
