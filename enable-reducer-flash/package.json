@@ -1,0 +1,8 @@
+{
+  "name": "@local/sol-pi-dsh-reducer-flash",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "实验开关：Reducer 固定走 deepseek-v4.1-flash，默认思考等级 + 温度 0",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

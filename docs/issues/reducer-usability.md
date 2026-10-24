@@ -128,3 +128,20 @@ Reducer 的链路已通，但真机始终停在 `fallback: unverifiable-quote`�
 ```
 
 只对 ≥4 KiB 的诊断日志触发；回执必须更小才替换，否则保留原文。
+
+## 追加验证：固定 deepseek-v4.1-flash（主对话当前模型）
+
+按你的要求，不用 effort=high 解析出的 pro，而是**显式固定** `reducerProvider=opencode-go`、
+`reducerModel=deepseek-v4.1-flash`、思考等级留空（适配器默认）、温度 0，其余不变。
+用 `enable-reducer-flash` 开关跑了两条命令：
+
+| fixture | 源大小 | 结果 | 回执里的模型 |
+| --- | --- | --- | --- |
+| t5 真实形态 | 5,461 B / 132 行 | **applied**，5 条引文全部逐字校验 | `deepseek-v4.1-flash` |
+| t4 重复行 | 7,225 B / 96 行 | **applied**，3 条引文 | `deepseek-v4.1-flash` |
+
+结论：**主对话现在用的 deepseek-v4.1-flash 本身就能通过逐字校验**；之前的失败不是模型能力不足，
+而是没传调优参数 + 提示词没有要求“短而唯一”。`reducer_total_tokens` 分别为 3,152 / 4,195。
+
+回滚：`remove_bundle @local/sol-pi-dsh-reducer-flash` applied；desktop 三个 profile 文件 sha256
+与快照一致。`enable-reducer-flash/` 作为“固定 flash”的可复用开关提交。

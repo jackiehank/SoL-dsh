@@ -1,0 +1,11 @@
+- id: sol-pi-dsh
+  config:
+    version: 1
+    actionFusion: false
+    observationPack: false
+    evidencePreservingReducer: true
+    onlineContextCompact: false
+    reducerProvider: opencode-go
+    reducerModel: deepseek-v4.1-flash
+    reducerTemperature: 0
+    diagnostics: false
