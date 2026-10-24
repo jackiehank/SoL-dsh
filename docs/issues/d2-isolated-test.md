@@ -175,3 +175,38 @@ Electron application"*。所以不改 `~/.dsh/profiles/desktop/*`，而是走**�
 - 打开 compaction-basic 会影响**所有会话**的压缩行为；测试窗口保持短（一次 D2），期间不在别处并发使用；
 - 若出现 compaction 循环、会话报错或工具列表异常：立即第 5 步回滚；
 - 压缩本身会调用一次摘要模型（真实成本，约一次上下文摘要量级）。
+
+## 真实环境 D2：结果与回滚
+
+### 执行
+
+1. 快照 desktop 的 `package.json` / `cordis.patch.yml` / `cordis.yml` 到 `.tmp/d2-snapshots/`（sha256 已记）；
+2. `install_bundle enable-bundle`（覆盖 `compaction-basic: disabled=false` + `sol-pi-dsh` 开 compact），
+   应用成功；启动后账本出现 `{"scope":"online-context-compact","event":"attached"}` → 服务真的可用；
+3. 子代理跑 D2（3 步 todo → 完成边界 → 8 个 SHA256）；
+4. `remove_bundle enable-bundle` 回滚；三个 profile 文件 sha256 与快照**逐字节一致**。
+
+### 结果
+
+- 账本：第一次完成边界 `remaining=2` → `skip: no-range`（上下文还太小）；第二次边界 `remaining=0`
+  → **`compacted`**，`reason=first-boundary`，`shadowedTokens=1660`，区间 `start=8 end=10`；
+- 会话事件：`compaction/start`(seq 94) → `compaction/summary`(95) → `compaction/end`(97)；
+- **同一 turn 继续**：`turn/start` 只有 1 次，summary 之后仍有 2 条 assistant 消息与工具结果；
+- 正确性：8 个 SHA256 全部与 `expected.json` 一致；
+- 账本另有一条更早的 `boundary`（`remaining=2`）对应首次 `todo_write` 更新，证明边界判定与冷却都按预期工作。
+
+### 判读
+
+- D2 的接线（完成边界 → 区间选择 → `compactRegion` → 账本 → 同 turn 继续）在真实 profile 上**全部成立**；
+- `no-range` 分支被真实触发过，说明“上下文不足时不压缩”的守卫有效；
+- 本次压缩 `shadowedTokens=1660` 很小，属于机制验证而非收益测量。
+
+### 回滚清单（已执行）
+
+| 项 | 结果 |
+| --- | --- |
+| `remove_bundle @local/sol-pi-dsh-enable` | applied |
+| `~/.dsh/profiles/desktop/package.json` | sha256 与快照一致 |
+| `~/.dsh/profiles/desktop/cordis.patch.yml` | sha256 与快照一致 |
+| `~/.dsh/profiles/desktop/cordis.yml` | sha256 与快照一致 |
+| `sol-pi-dsh` 行配置 | 退回 bundle 默认（全关） |
