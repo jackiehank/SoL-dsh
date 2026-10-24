@@ -164,3 +164,51 @@ README 原文把四个开关分成两档：
 | 激进 | Online Context Compact | 在 `agent/pre-step` 触发一次压缩/摘要调用，改变后续 surface，影响正在进行的运行 |
 
 结论：实验顺序应与上游推荐一致——先在保守档拿信号，再决定是否为激进档花成本。
+
+## 实验方案（hypothesize）
+
+### 目的与假设
+
+- H1（ObservationPack）：同一任务里，大工具输出被替换后，**总 token 与 cache read 下降**，而任务正确性不变。
+- H2（Action Fusion）：同一任务里，“改文件→跑验证”合并成一次调用后，**工具调用数/step 数下降 1～2 次**，
+  正确性不变。
+- H3（激进档，单点）：Reducer 能把一条长失败日志换成更小的回执且校验通过；Compact 能在完成边界压缩一次
+  并让同一 turn 继续。**这两条只验证机制跑通，不做收益对比**（成本高、样本小没有统计意义）。
+
+### 任务（小样本，全部本地、自带断言）
+
+| 任务 | 内容 | 触发机制 | 正确性判据 |
+| --- | --- | --- | --- |
+| T1 | 读一个约 40 KB 的本地日志，回答其中第 N 行的错误码 | ObservationPack | 回答包含准确错误码 |
+| T2 | 修改一个函数并运行 `node --test`（或等价断言脚本） | Action Fusion | 测试退出码 0 |
+| T3 | 运行一个会失败的测试脚本，读取其长日志并说出首个失败用例 | Reducer | 说出正确用例名 |
+
+### 矩阵与重复
+
+| 组 | 配置 | 任务 | 目的 |
+| --- | --- | --- | --- |
+| A0 | 全关 | T1 | 基线 |
+| A1 | 只开 observationPack | T1 | H1 |
+| B0 | 全关 | T2 | 基线 |
+| B1 | 只开 actionFusion | T2 | H2 |
+| C1 | 只开 reducer | T3 | H3（单点） |
+| D1 | 只开 compact | 长会话（可用现有长会话续聊） | H3（单点） |
+
+每个组合 1 次（成本优先）；若 A1/B1 出现方向性差异，再决定是否加第 2 次重复。模型、推理强度、沙箱权限、
+任务文本全部固定。
+
+### 观测与判定
+
+- 采集：`node tools/measure-sessions.mjs --workspace <ws> --json`（只读），对比 A1−A0、B1−B0 的
+  `input / cacheRead / total / toolCalls / steps / fusion / placeholders`；
+- 通过条件：正确性全对 **且** 预期指标方向正确（H1：total 下降；H2：calls 或 steps 下降）；
+- 反证条件：指标无变化、变差，或正确性失败 → 记为“未证明有效”，如实写进结论；
+- 成本上限：每次 run 输入 token 上限 40k，超过即中止并记录；总预算约 4 次短任务。
+
+### 执行约束与已知麻烦
+
+- 切配置要重装 bundle（`plugin_manager remove+install`），影响面是全 profile；两次切换 = 4 次操作，
+  不花模型 token，但会短暂改变当前会话行为——跑 A/B 期间不要在别处并发使用；
+- 采集器 `todos` 列目前恒 0（事件名不对），B/D 组前先修；
+- T3 的 Reducer 需要先配 `reducerProvider/reducerModel`（或用 `agentDefaultModel` 默认路由），
+  属于“日志出机”的敏感路径，执行前再确认一次。
