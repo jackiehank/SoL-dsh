@@ -54,3 +54,18 @@
 2. **历史 issue 文档**：是否在旧文档顶部加一行“改名说明”，还是完全不动？
 3. **重装影响**：行 id 从 `sol-pi-dsh` 改为 `sol-dsh` 后，profile 里旧的 bundle 行需要卸载重装，
    新行不会自动接管旧行配置。
+
+## 方案（hypothesize）
+
+按你的决定：
+
+1. **身份标识全部改成 SoL-dsh**：包名 `@local/sol-dsh`、Loader 行 id `sol-dsh`、日志/错误前缀
+   `[sol-dsh]`、排障工具 `sol_dsh_status`、locale 标题 “SoL-dsh Efficiency Pack / SoL-dsh 效率包”、
+   `AGENTS.md`/`README.md`/`plugin/README.md` 的项目名、三个 `enable-*` 实验 bundle 的包名与目标 id；
+2. **环境变量也改**：`DSH_SOL_DSH_HOME`、`DSH_SOL_DSH_DIAGNOSTICS`（破坏性：旧变量名不再读取）；
+3. **协议常量保留**：`sol_pi_evidence_receipt_v1` 是回执格式标识，改了会让旧回执失去识别；
+4. **历史 issue 文档不动**：`docs/issues/` 里的旧名是历史记录，本 issue 记录这次改名；
+5. **重装**：旧行 `sol-pi-dsh` 与新行 `sol-dsh` 不会自动迁移，执行 `remove_bundle @local/sol-pi-dsh`
+   再 `install_bundle plugin/`，并核对 profile 文件状态。
+
+已知代价：设置过旧环境变量的用户需要改变量名；旧行配置不会随包名迁移（本插件默认全关，影响很小）。
