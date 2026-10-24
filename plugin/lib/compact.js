@@ -129,6 +129,7 @@ export function attachOnlineContextCompact(ctx, config) {
   }
 
   const sessions = new Map()
+  void appendLedger(config.storageRoot, { scope: 'online-context-compact', event: 'attached' })
   const stateFor = (agent) => {
     const key = String(agent.id)
     let state = sessions.get(key)
@@ -158,16 +159,18 @@ export function attachOnlineContextCompact(ctx, config) {
 
   // 请求计数：用于冷却。
   ctx.on('agent/request', async (payload, next) => {
+
     try {
       stateFor(payload.agent).requests += 1
     } catch {
       // 计数失败不影响请求。
     }
     return next()
-  })
+  }, { global: true })
 
   // 完成边界后的下一步之前尝试一次压缩；失败一律放行。
   ctx.on('agent/pre-step', async (payload, next) => {
+
     const state = stateFor(payload.agent)
     const boundary = state.tracker.takeBoundary()
     if (boundary === undefined || state.busy) return next()
@@ -210,7 +213,7 @@ export function attachOnlineContextCompact(ctx, config) {
       state.busy = false
     }
     return next()
-  })
+  }, { global: true })
 
   ctx.effect(() => () => {
     sessions.clear()
@@ -218,4 +221,6 @@ export function attachOnlineContextCompact(ctx, config) {
 
   return { sessions }
 }
+
+
 

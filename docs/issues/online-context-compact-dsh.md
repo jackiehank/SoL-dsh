@@ -85,3 +85,17 @@ turn 里自动续跑；原生拒绝（太小/已压缩/摘要被截断）记录 
 - 已验证：决策核心、装配路径、fail-open、无依赖时不激活（单测）。
 - 未验证：真实会话里的 `compactRegion` 调用（需要真实 turn、整 surface 稳定与一次摘要模型调用）；
   端到端只能在打开开关后由使用中的会话观察，失败会按 fail-open 记录。
+
+## D2 真机结果（未触发）
+
+按方案在开启 `onlineContextCompact`（`compactKeepRecentTokens=1500`、`compactSummaryTokens=300`、
+冷却 0）后跑了一个 14 step 的会话：3 次 `todo/write`（含一次把 in_progress 改为 completed 的完成边界）、
+13 次工具调用、1 个 turn，正确性（8 个 SHA256）全对。
+
+但**没有产生任何 `compaction/*` 事件**，账本里也没有 `online-context-compact` 记录——
+连 attach 时写的 `attached` 都没有。结论：`attachOnlineContextCompact` 在服务检查处提前返回，
+即本 profile 里 `ctx.get('compaction')` 或 `ctx.get('tokenMeter')` 不可用（与调研时看到的
+“`include:compaction-basic` 条目 inactive”一致）。插件按设计只警告、不激活，未影响会话。
+
+同时修掉一个真实缺陷：`agent/request` / `agent/pre-step` 监听器之前没带 `{ global: true }`，
+跨 scope 收不到事件；已改为 global，并在 attach 成功后写一条 `attached` 账本便于诊断。
