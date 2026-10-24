@@ -57,6 +57,7 @@ export function summarizeEvents(events) {
   const summary = {
     turns: 0,
     steps: 0,
+    requests: 0,
     assistantMessages: 0,
     toolCalls: 0,
     toolResults: 0,
@@ -78,6 +79,7 @@ export function summarizeEvents(events) {
     switch (event.type) {
       case 'turn/start': summary.turns += 1; break
       case 'step/start': summary.steps += 1; break
+      case 'request/header': summary.requests += 1; break
       case 'todo/write': summary.todos += 1; break
       case 'assistant/message': {
         summary.assistantMessages += 1
@@ -206,13 +208,14 @@ function main() {
     console.log(JSON.stringify({ sessions: limited, ledgers }, null, 2))
     return
   }
-  const header = ['session', 'turns', 'steps', 'calls', 'err', 'input', 'output', 'cacheR', 'total', 'fusion', 'pack', 'todos', 'compact']
+  const header = ['session', 'turns', 'steps', 'req', 'calls', 'err', 'input', 'output', 'cacheR', 'total', 'fusion', 'pack', 'todos', 'compact']
   console.log(header.join('\t'))
   for (const row of limited) {
     console.log([
       row.session.slice(0, 20),
       row.turns,
       row.steps,
+      row.requests,
       row.toolCalls,
       row.toolErrors,
       row.inputTokens,

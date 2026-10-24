@@ -297,3 +297,11 @@ H1′：同一长会话任务里，开启 ObsPack 后**后续请求对那条大�
 - 风险：模型可能把 8 个 sha256 合并成一条命令（则请求数不足，实验作废，需重跑并明确“一次一个文件”）；
   或模型只在占位符里看到 VALUE/TRAILER 就结束（正确性仍可判，重放次数变少，效应变弱）；
 - 采集缺口：`requests` 计数与 `obs_recall` 关联需要先补进 `tools/measure-sessions.mjs`（纯本地改动）。
+
+## 实验台就绪（跑 C0/C1 之前）
+
+- `tools/measure-sessions.mjs` 新增 `requests`（`request/header` 计数），文本表与 `--json` 都带；
+- `tools/make-t3-fixtures.mjs`：确定性生成 T3 素材（`data.json` 102,913 字节，第 7 条 `VALUE=7K9`、
+  末行 `TRAILER=OK-42`，首/尾 512 字节内均可命中，因此占位符足够答题、不强制 `obs_recall`），
+  8 个小文件与期望 SHA256 一起写到 `.tmp/efficacy/t3/expected.json`；
+- 生成器自检：`valueInHead=true`、`trailerInTail=true`、字节数 102,913（重复运行字节一致）。
