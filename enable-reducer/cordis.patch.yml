@@ -1,0 +1,10 @@
+- id: sol-pi-dsh
+  config:
+    version: 1
+    actionFusion: false
+    observationPack: false
+    evidencePreservingReducer: true
+    onlineContextCompact: false
+    reducerReasoningEffort: high
+    reducerTemperature: 0
+    diagnostics: false

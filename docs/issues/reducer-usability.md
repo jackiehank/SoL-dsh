@@ -104,3 +104,27 @@ Reducer 的链路已通，但真机始终停在 `fallback: unverifiable-quote`�
 ## 单测
 
 `tests/config.test.mjs` 6 项（新增调优键校验）、`tests/reducer.test.mjs` 12 项，全绿。
+
+## 落地
+
+- `plugin/lib/reducer.js`：`callReducer` 支持 `reasoningEffort`/`temperature`，**同一份 callConfig
+  同时用于 `prepareCall` 与 `stream`**；提示词 v2（短、唯一、完整行，≤200 字符，禁省略号/拼接/改空白，
+  evidence ≤5）；校验失败重试一次；账本 `provider_response` 带 `attempt`。
+- `plugin/lib/config.js`：新增 `reducerReasoningEffort`（字符串，空=默认）、`reducerTemperature`
+  （`null` 或 0–2），非法值装配期报错。
+- `enable-reducer/`：可复用实验开关（只开 reducer、high、温度 0）；`remove_bundle` 即回滚，
+  desktop profile 三个文件的 sha256 在本次实验中保持不变。
+- `tools/make-reducer-fixture.mjs`：真实形态素材（4.5 KB，失败行短且唯一）。
+- 验证：`tests/config.test.mjs` 6 项、`tests/reducer.test.mjs` 12 项全绿；真机 R3/R4 均 `applied`。
+
+### 推荐配置（默认路由）
+
+```yaml
+- id: sol-pi-dsh
+  config:
+    evidencePreservingReducer: true
+    reducerReasoningEffort: high
+    reducerTemperature: 0
+```
+
+只对 ≥4 KiB 的诊断日志触发；回执必须更小才替换，否则保留原文。

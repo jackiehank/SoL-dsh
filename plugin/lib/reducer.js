@@ -138,7 +138,8 @@ export function reducerInstructions() {
     'status must be success when is_error=false and failure when is_error=true.',
     'evidence must contain only exact, contiguous quotes copied byte-for-byte from the supplied log.',
     'Allowed evidence kinds: fatal, failure, warning, target, summary.',
-    `Return at most ${MAX_EVIDENCE_ITEMS} evidence items and keep each quote at most ${MAX_QUOTE_CHARS} characters.`,
+    "Return at most 5 evidence items and keep each quote at most 200 characters.",
+    'Quote the shortest complete line that proves the point; never join lines, never add an ellipsis, never change whitespace or punctuation.',
     'Prefer the first causal-looking fatal/failure signal, unique fatal signatures, failing targets, and useful warnings.',
     'Do not diagnose a fix, recommend an edit, invent a command, or claim that an omitted failure is absent.',
     'Set uncertain=true when the log is ambiguous or lacks a clear failure signal.',
@@ -260,10 +261,17 @@ export function receiptText(command, archive, validated, route) {
 /**
  * 一次受限归约调用。只接受正常结束（finish.kind === 'stop'）；超时与父信号都生效。
  */
-export async function callReducer(llm, route, input, { maxTokens, timeoutMs, signal, sessionId }) {
+export async function callReducer(llm, route, input, { maxTokens, timeoutMs, signal, sessionId, reasoningEffort, temperature }) {
   // prepareCall 会绑定这次调用的完整 config；stream 时再改 maxTokens 会被判成
   // “prepared LLM call config changed before adapter dispatch”，所以两处必须一致。
-  const prepared = await llm.prepareCall({ provider: route.provider, model: route.model, maxTokens })
+  const callConfig = {
+    provider: route.provider,
+    model: route.model,
+    maxTokens,
+    ...(reasoningEffort === undefined || reasoningEffort === '' ? {} : { reasoningEffort }),
+    ...(temperature === undefined || temperature === null ? {} : { temperature }),
+  }
+  const prepared = await llm.prepareCall(callConfig)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(new Error('reducer timed out')), timeoutMs)
   const signals = [controller.signal, signal].filter((item) => item !== undefined)
@@ -274,11 +282,9 @@ export async function callReducer(llm, route, input, { maxTokens, timeoutMs, sig
   let failure
   try {
     const stream = prepared.stream({
-      provider: route.provider,
-      model: route.model,
+      ...callConfig,
       system: reducerInstructions(),
       messages: [{ role: 'user', content: [{ type: 'text', text: input }] }],
-      maxTokens,
       signal: combined,
       ...(sessionId === undefined ? {} : { sessionId }),
     })
@@ -361,15 +367,22 @@ export function createReducerHandler({ ctx, config, route, archive }) {
         await appendLedger(config.storageRoot, { event: 'fallback', reason: 'reducer-model-unavailable', tool: exec.name })
         return decision
       }
-      const response = await callReducer(
-        llm,
-        route,
-        reducerInput(candidate.command, candidate.exitFailed, archived, candidate.body),
-        { maxTokens: config.reducerMaxOutputTokens, timeoutMs: config.reducerTimeoutMs, signal: exec.signal, sessionId: exec.agent?.id },
-      )
-      await appendLedger(config.storageRoot, { event: 'provider_response', totalTokens: response.totalTokens, bytes: response.text.length })
-
-      const validation = validateReceipt(stripCodeFence(response.text), archived, candidate.body, candidate.exitFailed)
+      const input = reducerInput(candidate.command, candidate.exitFailed, archived, candidate.body)
+      let response
+      let validation
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        response = await callReducer(llm, route, input, {
+          maxTokens: config.reducerMaxOutputTokens,
+          timeoutMs: config.reducerTimeoutMs,
+          signal: exec.signal,
+          sessionId: exec.agent?.id,
+          reasoningEffort: config.reducerReasoningEffort,
+          temperature: config.reducerTemperature,
+        })
+        await appendLedger(config.storageRoot, { event: 'provider_response', totalTokens: response.totalTokens, bytes: response.text.length, attempt })
+        validation = validateReceipt(stripCodeFence(response.text), archived, candidate.body, candidate.exitFailed)
+        if (validation.ok) break
+      }
       if (!validation.ok) {
         await appendLedger(config.storageRoot, { event: 'fallback', reason: validation.reason, tool: exec.name })
         return decision

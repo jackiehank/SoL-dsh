@@ -33,6 +33,10 @@ export const DEFAULT_CONFIG = Object.freeze({
   reducerMaxChars: 600_000,
   reducerTimeoutMs: 90_000,
   reducerMaxOutputTokens: 2_048,
+  /** 归约调用的思考等级（可选，空串=适配器默认）。 */
+  reducerReasoningEffort: '',
+  /** 归约调用的温度（可选，null=适配器默认）。 */
+  reducerTemperature: null,
   /** Online Context Compact：计划完成点触发原生压缩。 */
   onlineContextCompact: false,
   compactKeepRecentTokens: 20_000,
@@ -84,8 +88,11 @@ export function resolveConfig(raw) {
   positiveInteger('compactKeepRecentTokens', config.compactKeepRecentTokens, 1)
   positiveInteger('compactMinRequestsSinceLast', config.compactMinRequestsSinceLast, 0)
   positiveInteger('compactSummaryTokens', config.compactSummaryTokens, 1)
-  for (const key of ['reducerProvider', 'reducerModel']) {
+  for (const key of ['reducerProvider', 'reducerModel', 'reducerReasoningEffort']) {
     if (typeof config[key] !== 'string') fail(`${key} 必须是字符串`)
+  }
+  if (config.reducerTemperature !== null && (typeof config.reducerTemperature !== 'number' || !Number.isFinite(config.reducerTemperature) || config.reducerTemperature < 0 || config.reducerTemperature > 2)) {
+    fail('reducerTemperature 必须是 0-2 的有限数或 null')
   }
   positiveInteger('reducerMinBytes', config.reducerMinBytes, 1)
   positiveInteger('reducerMaxChars', config.reducerMaxChars, config.reducerMinBytes)
@@ -105,6 +112,7 @@ export function resolveConfig(raw) {
 
   return Object.freeze(config)
 }
+
 
 
 
