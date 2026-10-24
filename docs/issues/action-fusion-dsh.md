@@ -38,3 +38,23 @@ DSH 现状：`edit` / `write` 只改文件，验证命令要另起一次 `pwsh`�
 - 成功路径一次调用完成编辑 + 命令，模型看到两段内容；
 - 编辑失败、命令失败、命令超时、命令被审批拒绝四条路径都有确定文案，且编辑结果不丢；
 - `node --test tests` 覆盖上述路径（用假的全局 `edit`/`write`/`pwsh` 定义驱动管线）。
+
+## 落地
+
+- 入口：`plugin/lib/action-fusion.js`（`attachActionFusion` 在 `agent/created` 时向 `agent.ctx`
+  注册 scoped 的 `edit`/`write`），定义工厂 `createFusedDefinition` 复用内建定义的
+  `parameters`/`output`/`presentCall`/`presentResult`。
+- schema：在内建参数 map 上追加可选 `then_run`，原有必填项与字段顺序不变；
+  关闭 `actionFusion` 时插件根本不注册，模型看到的就是内建 schema。
+- 命令：`createCommandRunner` 调 `ctx.tools.execute({name:'pwsh'|'bash'})`，参数按该工具自己的
+  schema 过滤（只传它认识的 `timeoutMs`/`workdir`），审批、沙箱、输出截断都走同一条管线。
+- 返回：编辑结果的值与呈现完全来自内建定义；命令报告在 `finalizeContent` 追加
+  `[then_run:succeeded|failed]` + 输出，命令失败不回滚编辑、不把整次调用标错。
+- 编辑失败：有 `then_run` 时错误里补 `[then_run:skipped]`，命令不执行。
+- 并发保护：命令启动前对目标文件做一次 sha256 前后比对（`assertUnchangedBeforeCommand`），
+  被并发改写则按失败报告；解析不到路径时跳过这一步。
+- 全局工具晚注册：`tools/change` 上补装一次（只装一次，注册期间重入被 `installed` 标志挡住）。
+- 验证：`node tests/action-fusion.test.mjs` 14 项通过，覆盖 schema 合并、成功/失败/跳过/命令抛错、
+  内建呈现委托、shell 工具缺失、scoped 遮蔽与晚注册补装。
+- 未决：`ctx.tools.execute` 在工具体内嵌套派发时的调度行为（是否会与独占执行互等）只在
+  测试替身上验证过，需要在真实 profile 打开 `actionFusion` 后跑一次编辑 + 命令确认。
