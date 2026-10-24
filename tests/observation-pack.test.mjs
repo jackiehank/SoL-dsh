@@ -9,6 +9,7 @@ import {
   createObservation,
   createPostExecuteHandler,
   createRecallDefinition,
+  formatBytes,
   placeholderFor,
   textOfContent,
 } from '../plugin/lib/observation-pack.js'
@@ -201,6 +202,48 @@ test('obs_recall：未知 id、非法 id、越界 offset 都报错', async () =>
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('展示层：obs_recall 卡片标题带字节/行数，横幅只出现在卡片里', async () => {
+  const { root, store } = await tempStore()
+  try {
+    const text = 'x'.repeat(3000)
+    const id = `obs_${sha256('card').slice(0, 24)}`
+    await store.save(id, text, { bytes: Buffer.byteLength(text, 'utf8'), hash: sha256(text) })
+    const recall = createRecallDefinition({ store })
+    const value = await recall.execute({ id }, exec)
+
+    // 投影随结果持久化，只给 UI 用
+    const meta = recall.output.presentationMeta({}, value)
+    assert.equal(meta.id, id)
+    assert.equal(meta.bytes, 3000)
+    assert.equal(meta.lines, value.lines)
+
+    // 卡片标题带人类可读字节数，正文末尾是横幅
+    const view = recall.presentResult({ id }, { content: [{ type: 'text', text: 'page' }], isError: false, meta })
+    assert.equal(view.card, 'generic')
+    assert.match(view.title, /2\.9 KiB/u)
+    assert.equal(view.content.length, 2)
+    assert.match(view.content[1].text, /ObservationPack/u)
+
+    // 模型看到的内容里没有横幅（present* 不进上下文）
+    const rendered = recall.output.render({}, value)
+    assert.equal(rendered.length, 1)
+    assert.doesNotMatch(rendered[0].text, /⚡/u)
+
+    assert.equal(recall.presentCall({ id, offset: 0 }).kind, 'read')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('formatBytes：B / KiB / MiB 三档', () => {
+  assert.equal(formatBytes(0), '0 B')
+  assert.equal(formatBytes(900), '900 B')
+  assert.equal(formatBytes(2048), '2 KiB')
+  assert.equal(formatBytes(3000), '2.9 KiB')
+  assert.equal(formatBytes(3 * 1024 * 1024), '3 MiB')
+  assert.equal(formatBytes(undefined), '0 B')
 })
 
 test('归档已存在：同内容复用，异内容报损坏（不是缓存命中）', async () => {
