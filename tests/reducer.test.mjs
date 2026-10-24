@@ -201,13 +201,7 @@ function execFor(command, extra = {}) {
 test('handler：可校验回执替换原文，原文进归档，账本记录 applied', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sol-pi-reducer-'))
   try {
-    const config = resolveConfig({
-      evidencePreservingReducer: true,
-      reducerProvider: 'test',
-      reducerModel: 'm',
-      reducerMinBytes: 16,
-      storageRoot: root,
-    })
+    const config = { ...resolveConfig({ evidencePreservingReducer: true }), reducerProvider: 'test', reducerModel: 'm', reducerMinBytes: 16, storageRoot: root }
     const handler = makeHandler({ config, llmRaw: receipt() })
     const decision = await handler(execFor('go test ./...'), resultFor(BODY, true), async () => ({ kind: 'accept' }))
 
@@ -231,13 +225,7 @@ test('handler：可校验回执替换原文，原文进归档，账本记录 app
 test('handler：引文不匹配、模型失败、非诊断命令、太小、疑似密钥都保留原文', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sol-pi-reducer-'))
   try {
-    const config = resolveConfig({
-      evidencePreservingReducer: true,
-      reducerProvider: 'test',
-      reducerModel: 'm',
-      reducerMinBytes: 16,
-      storageRoot: root,
-    })
+    const config = { ...resolveConfig({ evidencePreservingReducer: true }), reducerProvider: 'test', reducerModel: 'm', reducerMinBytes: 16, storageRoot: root }
     const mismatch = receipt({ evidence: [{ kind: 'fatal', quote: 'FAIL: NotThere' }] })
     const plain = resultFor(BODY, true)
     const accept = async () => ({ kind: 'accept' })
@@ -265,13 +253,7 @@ test('handler：引文不匹配、模型失败、非诊断命令、太小、疑�
 test('handler：嵌套调用与“回执不比原文小”不替换', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sol-pi-reducer-'))
   try {
-    const config = resolveConfig({
-      evidencePreservingReducer: true,
-      reducerProvider: 'test',
-      reducerModel: 'm',
-      reducerMinBytes: 1,
-      storageRoot: root,
-    })
+    const config = { ...resolveConfig({ evidencePreservingReducer: true }), reducerProvider: 'test', reducerModel: 'm', reducerMinBytes: 1, storageRoot: root }
     const accept = async () => ({ kind: 'accept' })
 
     const nested = await makeHandler({ config, llmRaw: receipt() })(

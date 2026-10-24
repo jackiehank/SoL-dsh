@@ -5,6 +5,4 @@
     observationPack: false
     evidencePreservingReducer: true
     onlineContextCompact: false
-    reducerReasoningEffort: high
-    reducerTemperature: 0
-    diagnostics: false
+    cacheWriteReadRatio: 12.5

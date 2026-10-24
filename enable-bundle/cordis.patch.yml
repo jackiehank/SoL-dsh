@@ -7,11 +7,4 @@
     observationPack: false
     evidencePreservingReducer: false
     onlineContextCompact: true
-    compactKeepRecentTokens: 1500
-    compactSummaryTokens: 300
-    compactMinRequestsSinceLast: 0
-    compactFirstScale: 1
-    compactMargin: 1
-    storageRoot: ''
-    ledger: true
-    diagnostics: true
+    cacheWriteReadRatio: 12.5

@@ -101,3 +101,14 @@ reducer provider/model 可省略→内置路由；**未知键、版本不符、�
 
 - 之前文档里的调优键（`reducerTemperature`、compact 五参数等）不再可配；想改只能改代码或测试里覆盖常量；
 - `cacheWriteReadRatio` 目前只为兼容保留并校验，**不参与决策**（我们的 economics 尚未用它），README 明说。
+
+## 落地
+
+- `plugin/lib/config.js`：`PUBLIC_KEYS`/`DEFAULT_CONFIG` 为 8 键；`INTERNAL_DEFAULTS` 承接上游硬编码阈值；
+  `resolveStorageRoot()`（`DSH_SOL_PI_HOME` → `<DSH_HOME>/sol-pi`）、`envFlag('DSH_SOL_PI_DIAGNOSTICS')`；
+  reducer 长键名映射到内部短名；`cacheWriteReadRatio` 校验（有限非负）但暂不参与决策。
+- `plugin/cordis.patch.yml` 与 `enable-bundle/`、`enable-reducer/`、`enable-reducer-flash/` 全部改为 8 键写法。
+- `plugin/README.md`：配置表只剩 8 键 + 两个环境变量；说明阈值不开放、账本常开。
+- 测试：`tests/config.test.mjs` 重写为 8 项（默认值、内部默认、环境变量、长键名映射、未知键/旧键报错、
+  取值校验）；`compact.test.mjs`、`reducer.test.mjs` 改为“解析后覆盖字段”的实验写法。全量 52 项通过。
+- 真机：用新配置重装 `@local/sol-pi-dsh`，`application: applied`（旧键配置若残留会直接报错）。

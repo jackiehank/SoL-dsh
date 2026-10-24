@@ -110,16 +110,7 @@ function fakeCtx({ compaction, tokenMeter, storageRoot }) {
 
 async function tempConfig(overrides = {}) {
   const root = await mkdtemp(join(tmpdir(), 'sol-pi-compact-'))
-  const config = resolveConfig({
-    onlineContextCompact: true,
-    storageRoot: root,
-    compactKeepRecentTokens: 3_000,
-    compactSummaryTokens: 100,
-    compactMinRequestsSinceLast: 0,
-    compactFirstScale: 1,
-    compactMargin: 1,
-    ...overrides,
-  })
+  const config = { ...resolveConfig({ onlineContextCompact: true }), ...{ storageRoot: root, compactKeepRecentTokens: 3_000, compactSummaryTokens: 100, compactMinRequestsSinceLast: 0, compactFirstScale: 1, compactMargin: 1 }, ...overrides }
   return { root, config }
 }
 

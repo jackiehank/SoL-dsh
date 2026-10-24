@@ -1,5 +1,7 @@
 # SoL-Pi 的 DSH 移植：四个机制都默认关闭，按需打开。
-# 打开某个机制 = 改这一行的 config，然后让 profile 重新加载（插件重装或重启 Harness）。
+# 配置键与上游 sol-pi 一致（8 个）；阈值不开放，DSH 目录/排障走环境变量：
+#   DSH_SOL_PI_HOME        归档根目录（默认 <DSH_HOME>/sol-pi）
+#   DSH_SOL_PI_DIAGNOSTICS=1  注册 sol_pi_status 排障工具
 - insert:
     - id: sol-pi-dsh
       name: '@local/sol-pi-dsh'
@@ -7,14 +9,12 @@
         version: 1
         # 编辑/写入后在同一调用里跑 then_run（命令走 pwsh，同一套审批与沙箱）。
         actionFusion: false
-        # 超过阈值的纯文本工具结果换成句柄，原文进本地归档，用 obs_recall 分页读回。
+        # 超过 10 KiB 的纯文本结果换成句柄，原文归档，用 obs_recall 分页读回。
         observationPack: false
-        # 默认 10 KiB；调小会让更多结果被换掉，调大只影响特别大的结果。
-        observationPackThresholdBytes: 10240
-        # 归档根目录；留空 = <DSH_HOME>/sol-pi。
-        storageRoot: ''
-        recallMaxBytes: 16384
-        recallMaxLines: 400
-        ledger: true
-        # 排障用：注册 sol_pi_status，报告各 agent 的 then_run 安装情况。
-        diagnostics: false
+        # 诊断日志（≥4 KiB）压成逐字可校验的回执；provider/model 留空 = 默认路由。
+        evidencePreservingReducer: false
+        evidencePreservingReducerProvider: ''
+        evidencePreservingReducerModel: ''
+        # 计划完成点触发原生压缩（同一 turn 继续）。
+        onlineContextCompact: false
+        cacheWriteReadRatio: 12.5

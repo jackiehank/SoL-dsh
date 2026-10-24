@@ -4,8 +4,7 @@
     actionFusion: false
     observationPack: false
     evidencePreservingReducer: true
+    evidencePreservingReducerProvider: opencode-go
+    evidencePreservingReducerModel: deepseek-v4.1-flash
     onlineContextCompact: false
-    reducerProvider: opencode-go
-    reducerModel: deepseek-v4.1-flash
-    reducerTemperature: 0
-    diagnostics: false
+    cacheWriteReadRatio: 12.5

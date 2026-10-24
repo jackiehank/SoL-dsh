@@ -1,44 +1,56 @@
 /**
  * SoL-Pi for DSH — 配置读取与校验。
  *
- * 与上游一致：一个有效配置，未知键、类型错误、非法取值都在装配阶段直接报错，
- * 不做“猜你想要”的静默降级。缺省值 = 四个机制全关。
+ * 与上游 sol-pi 对齐：对外只暴露 8 个键（`version`、四个机制开关、归约 provider/model、
+ * `cacheWriteReadRatio`）。其余阈值全部取上游同款硬编码默认；DSH 特有的两件事走环境变量：
+ *
+ * - `DSH_SOL_PI_HOME`：归档根目录（默认 `<DSH_HOME>/sol-pi`）；
+ * - `DSH_SOL_PI_DIAGNOSTICS=1`：注册 `sol_pi_status` 排障工具。
+ *
+ * 未知键、类型错误、非法值都在装配阶段直接报错，不做静默降级。
  */
 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-/** 支持的配置键及其缺省值。键名与上游 sol-pi.json 保持同名，方便对照。 */
+/** 对外可配置的键，与上游 `sol-pi.example.json` 完全一致。 */
+export const PUBLIC_KEYS = Object.freeze([
+  'version',
+  'actionFusion',
+  'observationPack',
+  'evidencePreservingReducer',
+  'evidencePreservingReducerProvider',
+  'evidencePreservingReducerModel',
+  'onlineContextCompact',
+  'cacheWriteReadRatio',
+])
+
+/** 对外配置的缺省值（与上游一致）。 */
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
   actionFusion: false,
   observationPack: false,
-  /** 超过该 UTF-8 字节数的纯文本工具结果才会被换成句柄。 */
+  evidencePreservingReducer: false,
+  evidencePreservingReducerProvider: '',
+  evidencePreservingReducerModel: '',
+  onlineContextCompact: false,
+  cacheWriteReadRatio: 12.5,
+})
+
+/**
+ * 内部默认值（上游把这些写死在源码里，不开放配置）。
+ * 实验需要临时改阈值时，直接在自己的脚本里覆盖解析后的对象，不再暴露配置键。
+ */
+export const INTERNAL_DEFAULTS = Object.freeze({
   observationPackThresholdBytes: 10 * 1024,
-  /** 归档根目录；留空 = <DSH_HOME>/sol-pi。 */
-  storageRoot: '',
-  /** 单次 obs_recall 的最大字节数与行数（含头部预留）。 */
   recallMaxBytes: 16 * 1024,
   recallMaxLines: 400,
-  /** 是否把每次 full/placeholder/recall 记到 ledger.jsonl（只记账，不进上下文）。 */
-  ledger: true,
-  /** 诊断开关：注册一个 `sol_pi_status` 工具，报告 agent 安装状态与最近错误。 */
-  diagnostics: false,
-  /** Evidence-Preserving Reducer：把诊断日志压成逐字可校验的回执。 */
-  evidencePreservingReducer: false,
-  /** 归约用的 provider/model；留空则用 agentDefaultModel 的当前选择。 */
-  reducerProvider: '',
-  reducerModel: '',
-  reducerMinBytes: 4096,
+  reducerMinBytes: 4_096,
   reducerMaxChars: 600_000,
   reducerTimeoutMs: 90_000,
   reducerMaxOutputTokens: 2_048,
-  /** 归约调用的思考等级（可选，空串=适配器默认）。 */
   reducerReasoningEffort: '',
-  /** 归约调用的温度（可选，null=适配器默认）。 */
-  reducerTemperature: null,
-  /** Online Context Compact：计划完成点触发原生压缩。 */
-  onlineContextCompact: false,
+  reducerTemperature: 0,
   compactKeepRecentTokens: 20_000,
   compactMinRequestsSinceLast: 2,
   compactFirstScale: 2,
@@ -46,73 +58,67 @@ export const DEFAULT_CONFIG = Object.freeze({
   compactSummaryTokens: 1_000,
 })
 
-const KNOWN_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
+const KNOWN_KEYS = new Set(PUBLIC_KEYS)
 
 function fail(message) {
   throw new Error(`sol-pi-dsh 配置错误：${message}`)
 }
 
-/** 校验一个非负整数，越界即报错。 */
-function positiveInteger(name, value, min = 0) {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < min) {
-    fail(`${name} 必须是 >= ${min} 的整数，收到 ${JSON.stringify(value)}`)
-  }
-  return value
+function dshHome() {
+  const home = process.env.DSH_HOME
+  return home !== undefined && home.trim().length > 0 ? home : join(homedir(), '.dsh')
+}
+
+/** 环境变量开关：`1` 或 `true` 视为开启。 */
+function envFlag(name) {
+  const value = process.env[name]
+  return value === '1' || value === 'true'
+}
+
+/** 归档根目录：`DSH_SOL_PI_HOME` 优先，否则 `<DSH_HOME>/sol-pi`。 */
+export function resolveStorageRoot() {
+  const configured = process.env.DSH_SOL_PI_HOME
+  if (configured !== undefined && configured.trim().length > 0) return configured
+  return join(dshHome(), 'sol-pi')
 }
 
 /**
  * 把 bundle 行里的原始 config 收敛成一份完整、可信的配置。
  *
  * @param raw - cordis.patch.yml 中 `config` 的原始值（可以是 undefined）。
- * @returns 冻结后的完整配置。
+ * @returns 冻结后的完整配置（含内部默认值与 DSH 环境派生项）。
  */
 export function resolveConfig(raw) {
   if (raw === undefined || raw === null) raw = {}
   if (typeof raw !== 'object' || Array.isArray(raw)) fail('config 必须是对象')
 
   for (const key of Object.keys(raw)) {
-    if (!KNOWN_KEYS.has(key)) fail(`未知配置键 "${key}"（可用：${[...KNOWN_KEYS].join(', ')}）`)
+    if (!KNOWN_KEYS.has(key)) {
+      fail(`未知配置键 "${key}"（只支持：${PUBLIC_KEYS.join(', ')}；阈值不可配，DSH 目录/排障用环境变量 DSH_SOL_PI_HOME / DSH_SOL_PI_DIAGNOSTICS）`)
+    }
   }
 
   const config = { ...DEFAULT_CONFIG, ...raw }
 
   if (config.version !== 1) fail(`不支持的 version ${JSON.stringify(config.version)}（只支持 1）`)
-  for (const key of ['actionFusion', 'observationPack', 'ledger', 'diagnostics', 'evidencePreservingReducer', 'onlineContextCompact']) {
+  for (const key of ['actionFusion', 'observationPack', 'evidencePreservingReducer', 'onlineContextCompact']) {
     if (typeof config[key] !== 'boolean') fail(`${key} 必须是布尔值`)
   }
-  for (const key of ['compactMargin', 'compactFirstScale']) {
-    if (typeof config[key] !== 'number' || !Number.isFinite(config[key]) || config[key] < 1) {
-      fail(`${key} 必须是 >= 1 的有限数`)
-    }
-  }
-  positiveInteger('compactKeepRecentTokens', config.compactKeepRecentTokens, 1)
-  positiveInteger('compactMinRequestsSinceLast', config.compactMinRequestsSinceLast, 0)
-  positiveInteger('compactSummaryTokens', config.compactSummaryTokens, 1)
-  for (const key of ['reducerProvider', 'reducerModel', 'reducerReasoningEffort']) {
+  for (const key of ['evidencePreservingReducerProvider', 'evidencePreservingReducerModel']) {
     if (typeof config[key] !== 'string') fail(`${key} 必须是字符串`)
   }
-  if (config.reducerTemperature !== null && (typeof config.reducerTemperature !== 'number' || !Number.isFinite(config.reducerTemperature) || config.reducerTemperature < 0 || config.reducerTemperature > 2)) {
-    fail('reducerTemperature 必须是 0-2 的有限数或 null')
-  }
-  positiveInteger('reducerMinBytes', config.reducerMinBytes, 1)
-  positiveInteger('reducerMaxChars', config.reducerMaxChars, config.reducerMinBytes)
-  positiveInteger('reducerTimeoutMs', config.reducerTimeoutMs, 1_000)
-  positiveInteger('reducerMaxOutputTokens', config.reducerMaxOutputTokens, 64)
-  positiveInteger('observationPackThresholdBytes', config.observationPackThresholdBytes, 1)
-  // 头部要留出 512 字节给 id/尺寸/召回指引，正文预算必须为正。
-  positiveInteger('recallMaxBytes', config.recallMaxBytes, 1024)
-  positiveInteger('recallMaxLines', config.recallMaxLines, 4)
-  if (typeof config.storageRoot !== 'string') fail('storageRoot 必须是字符串')
-  if (config.storageRoot.trim().length === 0) {
-    const home = process.env.DSH_HOME !== undefined && process.env.DSH_HOME.trim().length > 0
-      ? process.env.DSH_HOME
-      : join(homedir(), '.dsh')
-    config.storageRoot = join(home, 'sol-pi')
+  if (!Number.isFinite(config.cacheWriteReadRatio) || config.cacheWriteReadRatio < 0) {
+    fail(`cacheWriteReadRatio 必须是 >= 0 的有限数，收到 ${JSON.stringify(config.cacheWriteReadRatio)}`)
   }
 
-  return Object.freeze(config)
+  return Object.freeze({
+    ...config,
+    ...INTERNAL_DEFAULTS,
+    // 内部沿用短名字，避免各模块跟着上游长键名改一遍。
+    reducerProvider: config.evidencePreservingReducerProvider,
+    reducerModel: config.evidencePreservingReducerModel,
+    storageRoot: resolveStorageRoot(),
+    ledger: true,
+    diagnostics: envFlag('DSH_SOL_PI_DIAGNOSTICS'),
+  })
 }
-
-
-
-
