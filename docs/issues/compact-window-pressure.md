@@ -91,3 +91,31 @@
 - **它能补的位**：原生只在“超过 80% 窗口”或“已经溢出”时压；低于阈值时它什么都不做。
   我们的完成边界 + 经济性压缩是在**没有压力时**按计划进度做小步压缩，这条是互补的。
 
+## 结论：不接压力分支，保持 `pressure: false`
+
+依据（按重要性排序）：
+
+1. **原生已覆盖且更完整**：`compaction-basic` 默认 `auto: true`，在 `agent/pre-step` 按
+   `0.8 × contextWindow` 触发，先修剪再摘要；`agent/request-error` 还会对 `CONTEXT_WINDOW_EXCEEDED`
+   做一次强制归约并重发请求。我们在同一事件上加第二条压力路径，只会让同一问题被处理两次。
+2. **接上就有真实的双压缩风险**：两边都挂 `agent/pre-step`，同一步都触发时付两次摘要调用；
+   我们的 `selectRange` 不识别 `<compacted-summary>` checkpoint，会把刚生成的摘要再压一遍；
+   我们也没有 DSH 的 `assertCompactionInactive` 等价互斥（`busy` 只防自己）。
+3. **我们的边际价值在低压力区**：完成边界 + 经济性判断本来就在“没到 80%”时工作，与原生不重叠；
+   压力场景交给原生，收益/风险比更差的分支不值得移植。
+4. **可观测性不丢**：原生压缩在会话日志里留 `compaction/*` 事件，`/compact` 也照常可用；
+   真要诊断窗口压力，看这些事件即可，不需要我们另记一份账。
+
+因此：
+
+- `compact.js` 的 `pressure` 分支**保留但休眠**（装配处继续传 `false`），作为换到没有
+  `compaction-basic` 的 profile 时的备用路径，不删除（删了就丢掉了上游语义与测试覆盖）；
+- 如果将来真的要启用，前置条件是三件事，缺一不可：
+  1. 用 `ctx.llm.resolveModelInfo(provider, model, signal).context.contextWindow` +
+     `session.requestHeader().config` 拿容量与路由（**不是** `session.requestContext()`，DSH 无此 API）；
+  2. `selectRange` 要学会识别 compaction checkpoint（`isCompactCheckpointSource` / `<compacted-summary>`），
+     不把摘要再摘要；
+  3. 与原生互斥：检测 `compaction/start` 未闭合或刚完成时跳过，避免同一步压两次。
+
+行为不变：本次只改文档，不动插件代码；四个机制仍全关，`pressure: false` 保持原样。
+
