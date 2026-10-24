@@ -112,3 +112,66 @@ D2（Online Context Compact 真机验证）卡在环境上：desktop profile 没
 2. 定位 compaction 服务在注入后仍读不到的原因（下一动作：打印注入上下文的可用服务键）。
 
 代码改动（`ctx.inject` 时序）暂未提交，先保留在工作区，等验证通过再落。
+
+## 真实环境 D2：方案与恢复办法（hypothesize）
+
+### 目标
+
+在 **desktop profile** 上真实触发一次 `compactRegion`，同时保证可以**确定性回滚**。
+disabled 的 `compaction-basic` 需要打开；这是 profile 级变更，会影响所有会话，因此按“最小开启窗口”执行。
+
+### 为什么不能手改 profile
+
+`dsh --profile desktop --dump-config` 直接拒绝：*"profile desktop is managed exclusively by the
+Electron application"*。所以不改 `~/.dsh/profiles/desktop/*`，而是走**工作区 bundle + `plugin_manager`
+安装/卸载**这条受支持的开关路径（与之前装 `@local/sol-pi-dsh` 同一机制）。
+
+### 变更物（只新增，不改现有文件）
+
+新建 `enable-bundle/`（提交进仓库，作为可复用的实验开关）：
+
+```yaml
+# cordis.patch.yml
+- id: compaction-basic          # ← 第一步先探这个 id；不生效再试 include:compaction-basic
+  disabled: false
+- id: sol-pi-dsh
+  config:                       # 覆盖式替换，必须给全量键
+    version: 1
+    actionFusion: false
+    observationPack: false
+    evidencePreservingReducer: false
+    onlineContextCompact: true
+    compactKeepRecentTokens: 1500
+    compactSummaryTokens: 300
+    compactMinRequestsSinceLast: 0
+    compactFirstScale: 1
+    compactMargin: 1
+    storageRoot: ''
+    ledger: true
+    diagnostics: true
+```
+
+安装后：`sol-pi-dsh` 行配置变成 compact 开启；`compaction-basic` 若被成功启用，插件启动时会写
+`{"scope":"online-context-compact","event":"attached"}` 到
+`~/.dsh/sol-pi/evidence-preserving-reducer/ledger.jsonl` —— 这就是“服务真的可用了”的判据。
+
+### 执行顺序
+
+1. **快照**（只读，存 `.tmp/d2-snapshots/`）：`~/.dsh/profiles/desktop/{package.json,cordis.patch.yml,cordis.yml}`
+   的副本 + sha256；`Tool.listTools` 名称集合；`plugin_manager list_plugins` 结果；
+2. 建 `enable-bundle/` 并 `install_bundle`；
+3. **探针**：跑一个空任务（或直接看 ledger）确认 `attached` 出现；没出现就换 `include:compaction-basic` 再试一次；
+4. 子代理跑 D2 任务（3 步 todo → 完成边界 → 8 个 SHA256），随后检查：
+   `compaction/*` 事件、账本 `compacted`/`skipped`、同 turn 是否继续、8 个 hash 是否正确；
+5. **恢复**：`plugin_manager remove_bundle <enable-bundle>` → 立即确认：
+   - `sol-pi-dsh` 行配置回到全关（bundle patch 的默认值）；
+   - 工具列表与快照一致；
+   - profile 三个文件 sha256 与快照一致（安装/卸载不应触碰用户 patch 层）；
+6. 若恢复失败：先 `set_bundle enabled:false`；仍不行则重启 Harness；最后手段用快照副本回填
+   （仅这三个文件），并把结果写回 ledger/issue。
+
+### 风险与止损
+
+- 打开 compaction-basic 会影响**所有会话**的压缩行为；测试窗口保持短（一次 D2），期间不在别处并发使用；
+- 若出现 compaction 循环、会话报错或工具列表异常：立即第 5 步回滚；
+- 压缩本身会调用一次摘要模型（真实成本，约一次上下文摘要量级）。
