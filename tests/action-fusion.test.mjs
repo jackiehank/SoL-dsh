@@ -276,3 +276,22 @@ test('全局工具晚于本插件注册时，靠 tools/change 补装遮蔽', asy
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }
+
+test('基线工具只挂在 agent scope 时也要装得上（不能只看全局视图）', () => {
+  const root = createRootContext({ globalTools: [] })
+  const { agent, scope, preset, dispose } = createAgentScope(root)
+  try {
+    // 复刻真实布局：内建 edit 注册在 agent preset 的层里，全局层没有它。
+    preset.register(makeBase('edit'))
+    attachActionFusion(root, {})
+    root.emit('agent/created', { agent, source: 'test' })
+
+    assert.equal(root.tools.get('edit'), undefined)
+    const scopedEdit = scope.tools.get('edit')
+    assert.ok(scopedEdit !== undefined)
+    assert.ok(Object.hasOwn(scopedEdit.parameters.properties, 'then_run'))
+  } finally {
+    dispose()
+  }
+})
+

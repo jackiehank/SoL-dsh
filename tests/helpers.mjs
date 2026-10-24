@@ -6,8 +6,8 @@
  * 监听器或工具定义，验证的是插件自己的逻辑。
  */
 
-function createLayer(primary, fallback, onChange) {
-  return {
+function createLayer(primary, fallback, onChange, scopeOf) {
+  const layer = {
     register(definition) {
       if (primary.has(definition.name)) throw new Error(`duplicate tool ${definition.name}`)
       primary.set(definition.name, definition)
@@ -17,7 +17,11 @@ function createLayer(primary, fallback, onChange) {
         onChange?.()
       }
     },
-    get(toolName) {
+    get(toolName, scope) {
+      if (scope !== undefined) {
+        const scoped = scopeOf?.(scope)
+        if (scoped !== undefined) return scoped.get(toolName)
+      }
       return primary.get(toolName) ?? fallback?.get(toolName)
     },
     schemas() {
@@ -28,7 +32,7 @@ function createLayer(primary, fallback, onChange) {
       })
     },
     async execute(input) {
-      const definition = primary.get(input.name) ?? fallback?.get(input.name)
+      const definition = this.get(input.name, input.agent)
       if (definition === undefined) throw new Error(`unknown tool ${input.name}`)
       const exec = {
         callId: input.callId,
@@ -56,11 +60,14 @@ function createLayer(primary, fallback, onChange) {
       }
     },
   }
+  return layer
 }
 
 export function createRootContext({ globalTools = [], workingDirectory = process.cwd() } = {}) {
   const globals = new Map(globalTools.map((tool) => [tool.name, tool]))
   const listeners = new Map()
+  /** agent 对象 → 它的 scoped 工具层；`get(name, agent)` 要用它模拟作用域视角。 */
+  const layersByScope = new WeakMap()
 
   function on(event, callback) {
     if (!listeners.has(event)) listeners.set(event, new Set())
@@ -72,10 +79,11 @@ export function createRootContext({ globalTools = [], workingDirectory = process
     for (const callback of [...(listeners.get(event) ?? [])]) callback(payload)
   }
 
-  const tools = createLayer(globals, undefined, () => emit('tools/change'))
+  const tools = createLayer(globals, undefined, () => emit('tools/change'), (scope) => layersByScope.get(scope))
 
   const context = {
     _globals: globals,
+    _layersByScope: layersByScope,
     tools,
     on,
     emit,
@@ -104,8 +112,16 @@ export function createAgentScope(root, id = 'agent-1') {
     return () => listeners.get(event)?.delete(callback)
   }
 
+  const agent = { id, ctx: undefined }
+  // 真实布局有两层：agent preset 注册内建工具的那层（这里用 presetLayer 模拟）+
+  // 该 agent 自己的 scope 层（插件遮蔽版注册在这里）。
+  const presetMap = new Map()
+  const presetLayer = createLayer(presetMap, root._globals, () => root.emit('tools/change'), (scope) => root._layersByScope.get(scope))
+  const layer = createLayer(scoped, presetLayer, () => root.emit('tools/change'), (scope) => root._layersByScope.get(scope))
+  root._layersByScope.set(agent, layer)
+
   const scope = {
-    tools: createLayer(scoped, root._globals, () => root.emit('tools/change')),
+    tools: layer,
     // 真实 Harness 按 scope 过滤派发；测试里只关心事件能到达，统一挂到 root 的监听表。
     on: root.on,
     emit,
@@ -119,6 +135,7 @@ export function createAgentScope(root, id = 'agent-1') {
     },
     logger: root.logger,
   }
+  agent.ctx = scope
 
   function emit(event, payload) {
     for (const callback of [...(listeners.get(event) ?? [])]) callback(payload)
@@ -135,10 +152,12 @@ export function createAgentScope(root, id = 'agent-1') {
     }
   }
 
-  return { agent: { id, ctx: scope }, scope, dispose, scoped }
+  return { agent, scope, dispose, scoped, preset: { register: (definition) => presetLayer.register(definition) } }
 }
 
 /** 构造一个 tools/post-execute 的 accept 决策，方便驱动监听器。 */
 export function acceptDecision(content) {
   return content === undefined ? { kind: 'accept' } : { kind: 'accept', content }
 }
+
+

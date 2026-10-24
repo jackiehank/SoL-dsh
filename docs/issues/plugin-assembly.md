@@ -33,3 +33,23 @@ profile 做真机验收，出现了单测替身覆盖不到的三类装配失败
    `edit` 的 schema 与内建逐字节一致；
 4. 回归测试：内建 `edit` 只存在于 preset 层（全局层为空）时，遮蔽版仍能装上；
    构造“全局层为空 + preset 层有 edit”的替身，断言 scoped `edit` 带 `then_run`。
+
+## 复现与回归
+
+真机复现（desktop profile，bundle 0.1.x）：
+
+1. 只留 `export default` + `inject`：安装结果 `application: failed`，诊断原文
+   `sol-pi-dsh (@local/sol-pi-dsh): Error: cannot get property "tools" without inject`。
+2. 去掉 default 导出、机制打开后：`obs_recall` 立刻可用（全局注册），但 `edit` 仍没有
+   `then_run`；`sol_pi_status` 的 `state.skipped` 全是 `bases-not-found`，
+   `agents[].editHasThenRun` 全为 `false`。
+3. 改为 `ctx.tools.get(name, agent)` 后：`skipped` 为空、`installed` 等于 live agent 数、
+   `editHasThenRun` 全 `true`，`edit + then_run` 三条路径通过。
+
+回归测试（`tests/action-fusion.test.mjs`、`tests/helpers.mjs`）：
+
+- 替身补出两层：agent preset 层（内建工具所在）+ agent scope 层（遮蔽注册所在），
+  `root.tools.get(name, agent)` 按 agent 视角逐层回落；
+- 新用例「基线工具只挂在 agent scope 时也要装得上」：preset 层注册 `edit`、全局层为空，
+  断言插件仍装上遮蔽版且带 `then_run`；全局视图保持 `undefined`，证明查的是 agent 视角；
+- 原有 14 项保持通过（合计 15 项）。
