@@ -9,9 +9,10 @@
 | --- | --- | --- |
 | Action Fusion | `edit`/`write` 多一个可选 `then_run`：改完文件，同一次工具调用里跑校验/构建/启动命令 | `agent.ctx` 注册同名 scoped 工具遮蔽内建定义；命令走 `pwsh` 的同一套审批与沙箱 |
 | ObservationPack | 超过阈值的纯文本工具结果换成稳定句柄，原文归档，用 `obs_recall` 按字节精确分页读回 | `tools/post-execute` 替换 content；`value` 不动 |
+| Evidence-Preserving Reducer | 诊断类命令的长输出先归档，再压成逐字可校验的回执；任何引文不匹配就整体回退 | `tools/post-execute` + `ctx.llm` 受限调用；回执对压缩裁剪豁免 |
 
-另外两个机制（Evidence-Preserving Reducer、Online Context Compact）的适配方案与 DSH 抓手记在
-[`docs/issues/sol-pi-dsh.md`](docs/issues/sol-pi-dsh.md)，实现走各自的 issue。
+Online Context Compact 的适配方案与 DSH 抓手记在
+[`docs/issues/online-context-compact-dsh.md`](docs/issues/online-context-compact-dsh.md)。
 
 ## 安装
 
@@ -38,4 +39,5 @@ node tests/action-fusion.test.mjs
 - issue 全部由 **kiln** 管理（`kiln status` / `kiln path <issue>`），见 [`AGENTS.md`](AGENTS.md)；
 - 插件包零外部依赖（只用 Node 内置模块），配置在 bundle 的 patch 行里；
 - 每个机制的取舍与差异写在 `docs/issues/<issue>.md`，不写状态。
+
 

@@ -87,3 +87,8 @@
 要 global）单开为 issue `plugin-assembly`，修复与回归都在那条 issue 里。bundle 最终以 `0.1.1`
 装进 desktop profile，两个机制回到默认关闭；再打开只需改 `plugin/cordis.patch.yml` 的布尔值并让
 profile 重新加载。
+
+## 范围更新
+
+Reducer 已由 `evidence-preserving-reducer-dsh` 落地（归档 + 逐字校验 + 整体回退 + 账本），实现与
+配置见 `plugin/lib/reducer.js` 与 `plugin/README.md`。剩余未适配项只有 Online Context Compact。
