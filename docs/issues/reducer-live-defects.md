@@ -32,3 +32,15 @@
 3. 账本出现完整的 `candidate → provider_response → applied`（在能逐字复述的模型上），
    或 `fallback: unverifiable-quote`（在不能逐字复述的模型上）且原文逐字节不变；
 4. 代码围栏剥除有单测覆盖，且不改变“JSON 必须可解析、引文必须逐字”的硬约束。
+
+## 落地
+
+- `plugin/lib/index.js`：`apply()` 增加 `const diagnosticsInfo = {}`（开启 reducer 时写它不再抛错）。
+- `plugin/lib/reducer.js`：
+  - `prepareCall` 与 `stream` 使用同一份 `maxTokens`（解决 prepared-config 不一致）；
+  - 归约调用带 `sessionId`（`exec.agent.id`，满足 opencode-go 的 `x-opencode-session` 路由要求）；
+  - 新增 `stripCodeFence`（剥 ``` 围栏后再 `JSON.parse`），仍保持“JSON 必须可解析、引文必须逐字”的硬约束；
+  - 失败信息里带上 provider 的 `code/message`，便于从账本定位。
+- `tests/reducer.test.mjs`：新增围栏剥除用例（12 项全绿）。
+- 真机复测：插件激活成功；账本出现 `candidate`（7225 B）→ `provider_response`（3825 tokens）
+  → `fallback: unverifiable-quote`。前三个缺陷消失，第 4 条按设计 fail-closed（原文逐字节保留）。

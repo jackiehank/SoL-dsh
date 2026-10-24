@@ -85,6 +85,7 @@ function createStatusTool(ctx, fusion, diagnosticsInfo) {
 export function apply(ctx, rawConfig) {
   const config = resolveConfig(rawConfig)
   const active = []
+  const diagnosticsInfo = {}
   let fusion
 
   if (config.actionFusion) {

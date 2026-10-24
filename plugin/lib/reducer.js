@@ -159,6 +159,17 @@ export function reducerInput(command, isError, archive, body) {
   ].join('\n')
 }
 
+/** 模型偶尔把 JSON 包进 ``` 代码块；剥掉围栏不改内容，仍然要求 JSON.parse 通过。 */
+export function stripCodeFence(raw) {
+  const text = String(raw).trim()
+  if (!text.startsWith('`' + '`' + '`')) return text
+  const firstNewline = text.indexOf('\n')
+  if (firstNewline === -1) return text
+  const body = text.slice(firstNewline + 1)
+  const end = body.lastIndexOf('`' + '`' + '`')
+  return (end === -1 ? body : body.slice(0, end)).trim()
+}
+
 export function lineNumberOf(body, quote) {
   const index = body.indexOf(quote)
   if (index < 0) return undefined
@@ -249,8 +260,10 @@ export function receiptText(command, archive, validated, route) {
 /**
  * 一次受限归约调用。只接受正常结束（finish.kind === 'stop'）；超时与父信号都生效。
  */
-export async function callReducer(llm, route, input, { maxTokens, timeoutMs, signal }) {
-  const prepared = await llm.prepareCall({ provider: route.provider, model: route.model })
+export async function callReducer(llm, route, input, { maxTokens, timeoutMs, signal, sessionId }) {
+  // prepareCall 会绑定这次调用的完整 config；stream 时再改 maxTokens 会被判成
+  // “prepared LLM call config changed before adapter dispatch”，所以两处必须一致。
+  const prepared = await llm.prepareCall({ provider: route.provider, model: route.model, maxTokens })
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(new Error('reducer timed out')), timeoutMs)
   const signals = [controller.signal, signal].filter((item) => item !== undefined)
@@ -258,6 +271,7 @@ export async function callReducer(llm, route, input, { maxTokens, timeoutMs, sig
   let text = ''
   let usage
   let finish
+  let failure
   try {
     const stream = prepared.stream({
       provider: route.provider,
@@ -266,17 +280,24 @@ export async function callReducer(llm, route, input, { maxTokens, timeoutMs, sig
       messages: [{ role: 'user', content: [{ type: 'text', text: input }] }],
       maxTokens,
       signal: combined,
+      ...(sessionId === undefined ? {} : { sessionId }),
     })
     for await (const chunk of stream) {
       if (chunk.type === 'text-delta') text += chunk.text
       else if (chunk.type === 'usage') usage = chunk.usage
-      else if (chunk.type === 'finish') finish = chunk.reason
+      else if (chunk.type === 'finish') {
+        finish = chunk.reason
+        if (chunk.reason !== undefined && (chunk.reason.kind === 'error' || chunk.reason.kind === 'aborted')) {
+          failure = chunk.reason.failure
+        }
+      }
     }
   } finally {
     clearTimeout(timer)
   }
   if (finish === undefined || finish.kind !== 'stop') {
-    throw new Error(`reducer response not ok: ${finish === undefined ? 'missing-finish' : finish.kind}`)
+    const detail = failure === undefined ? '' : `: ${failure.code}: ${failure.message}`
+    throw new Error(`reducer response not ok: ${finish === undefined ? 'missing-finish' : finish.kind}${detail}`)
   }
   return {
     text: text.trim(),
@@ -344,11 +365,11 @@ export function createReducerHandler({ ctx, config, route, archive }) {
         llm,
         route,
         reducerInput(candidate.command, candidate.exitFailed, archived, candidate.body),
-        { maxTokens: config.reducerMaxOutputTokens, timeoutMs: config.reducerTimeoutMs, signal: exec.signal },
+        { maxTokens: config.reducerMaxOutputTokens, timeoutMs: config.reducerTimeoutMs, signal: exec.signal, sessionId: exec.agent?.id },
       )
       await appendLedger(config.storageRoot, { event: 'provider_response', totalTokens: response.totalTokens, bytes: response.text.length })
 
-      const validation = validateReceipt(response.text, archived, candidate.body, candidate.exitFailed)
+      const validation = validateReceipt(stripCodeFence(response.text), archived, candidate.body, candidate.exitFailed)
       if (!validation.ok) {
         await appendLedger(config.storageRoot, { event: 'fallback', reason: validation.reason, tool: exec.name })
         return decision
@@ -402,4 +423,6 @@ export function attachEvidencePreservingReducer(ctx, config) {
   ctx.on('tools/post-execute', createReducerHandler({ ctx, config, route, archive }))
   return { route, archive }
 }
+
+
 

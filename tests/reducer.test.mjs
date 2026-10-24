@@ -12,6 +12,7 @@ import {
   RECEIPT_SCHEMA,
   reducerInstructions,
   sha256,
+  stripCodeFence,
   validateReceipt,
 } from '../plugin/lib/reducer.js'
 import { resolveConfig } from '../plugin/lib/config.js'
@@ -310,3 +311,10 @@ test('archive：同内容复用，异内容同路径报完整性错误', async (
 })
 
 
+
+test('stripCodeFence：剥掉 Markdown 围栏，但 JSON 与逐字引文的约束不变', () => {
+  assert.equal(stripCodeFence('```json\n{"a":1}\n```'), '{"a":1}')
+  assert.equal(stripCodeFence('```\n{"a":1}\n```'), '{"a":1}')
+  assert.equal(stripCodeFence('  {"a":1}  '), '{"a":1}')
+  assert.equal(stripCodeFence('```json\n{"a":1}'), '{"a":1}')
+})
