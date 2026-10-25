@@ -70,23 +70,99 @@
 颜色继承 `--dsw-alias-label-tertiary`，hover 时可到 `--dsw-alias-label-secondary`。
 灰色闪电就是“线性 + currentColor”，不再用 emoji。
 
-## 需要先定下来的问题
+## 已确认的方向
 
-1. 灰色闪电的落点：只改 turnTail 行，还是 dock 行统一？用内联 SVG（`currentColor`）
-   还是 Unicode 文本字符？
-2. 可点击的是哪一处：只 dock，还是 turnTail 也可点？浮层的锚点、宽度、关闭方式
-   （点外部 / Esc / 再次点击）？
-3. 数字口径：
-   - token 用 `estimated_tokens`（4 字符/token 的估算）还是按字节折算？
-   - 百分比的分母是什么：本会话已用 token？当前上下文窗口？如果不省则会用掉的 token？
-   - 融合省下的一次往返怎么计（不计 / 固定折算）？
-4. 会话累计数据的来源：客户端扫描全部 turn（无需新通道，但要有全量快照），
-   还是宿主侧计数 + 下发（需要验证通道）？
-5. 空状态：本会话没有任何机制命中时，dock 是否仍显示（如 `⚡ 本会话暂未命中`）？
-6. 本轮范围：只出设计（conclude），还是设计 + 落地（apply）？
+- 本轮只出设计，方案确认后再落地；
+- 只有输入框下方那一行可点击；
+- 口径用 token 数 + 百分比（相对“不省时会消耗的 token”）。
 
-## 验收（设计阶段）
+## 设计
 
-- 给出两个状态面的最终形态：文案、图标、位置、交互、数据口径；
-- 给出降级路径（拿不到数据时显示什么、出错时是否隐藏）；
-- 不改任何代码，不装插件。
+### A. 每轮尾行（`conversation.chat.turnTail`）
+
+- 座位与位置不变（order 5，动作行之前）；只展示，不可点。
+- 图标：14px 灰色线性闪电（内联 SVG，`stroke="currentColor"`），颜色
+  `--dsw-alias-label-tertiary`；文字同色，12px / 20px，和 composer 状态条同字号。
+- 文案只列非零项：
+  - 有 token 收益：`⚡ 少写 12.2k tok · 收纳 1 · 回执 1`
+  - 只有融合：`⚡ 省 1 次往返`
+  - 全零：不渲染；调试开关打开时显示 `⚡ sol-dsh 已加载（本轮无机制命中）`
+- 鼠标悬停的 `title` 给完整四项计数 + 本轮 token + 一行口径说明。
+
+### B. 输入框下方（`conversation.composer.dock`）
+
+- 灰色闪电同款；按钮文案：`⚡ 已省 34.5k tok · 12.4%`（k/M 紧凑数，tabular-nums）。
+- 只在“本会话至少命中一次”时渲染；没有命中就整条不渲染（默认安静，命中后自然出现）。
+- 点击：向上弹出面板（`role="dialog"`，锚在按钮正上方 8px，视口 clamp），
+  点外部 / Esc / 再次点击关闭——照抄 dock 里 DSH 自己的 pill/dialog 交互。
+- 面板内容（对齐 DSH 的 stat dialog 视觉：`--dsw-specific-menu` 背景、radius-lg、
+  padding 16、标题 primary/500、0.5px 分隔线、两列 grid、右对齐数字）：
+
+  ```
+  ⚡ sol-dsh 本会话                  34,567 tok
+  ─────────────────────────────────────────────
+  收纳                3 次 · 9,800 tok
+  回执                1 次 · 1,200 tok
+  压缩                1 次 · 23,567 tok
+  融合                2 次往返
+  工具输出少写        12.4%
+  估算：4 字符 ≈ 1 token；只计首次写入，不含后续缓存读取。
+  ```
+
+  - 零项隐藏；压缩单独列，不计入“工具输出少写”的分母；
+  - 面板不 portal（避免动 `document.body`），绝对定位在 dock 的按钮容器内；
+    若被祖先裁剪，落地时再退回 portal。
+
+### C. 数据与公式
+
+1. 扫描范围：`useChat((s) => s.timeline.turnOrder)` 的每一轮 →
+   `locations.getTurn(turn)` → `nodes`；只读，不改快照。
+2. 收纳：`saved = estimated_tokens - ceil(占位符字符数 / 4)`；
+   `estimated_tokens` 直接取占位符里的字段。
+3. 回执：`saved = ceil((source_bytes - 回执字节数) / 4)`；`source_bytes` 从回执头解析。
+4. 压缩：`saved = Σ compaction 节点的 shadowedTokenCount`（只累加非负整数）。
+5. 融合：只计 `[then_run:succeeded]` 次数，不折算 token。
+6. 本会话 token 总数 = 2 + 3 + 4；每轮/本会话都按同一套公式算。
+7. 百分比（工具输出口径）：
+   `(收纳 + 回执) / (收纳 + 回执 + 本会话工具结果实际写入 token)`；
+   “实际写入”= 所有已落定工具结果文本的 `ceil(字符数 / 4)` 之和。
+8. 例子：占位符原始 12,200 字节、`estimated_tokens` 3,050，占位符自身 1,300 字节 ≈ 325 tok，
+   省 2,725 tok；回执 `source_bytes=8,400`、回执 3,100 字节，省 1,325 tok；
+   压缩 `shadowedTokenCount=23,000`。合计 27,050 tok；工具输出实际写入 20,000 tok，
+   “工具输出少写” = 4,050 / 24,050 ≈ 16.8%。
+
+### D. 降级与边界
+
+- 拿不到 `tokenUsage`：dock 隐藏百分比，只留 token 总数；
+- 快照分页：累计只覆盖已加载窗口，不伪造“全量”；
+- 估算性质：4 字符/token 只用于展示，不是计费口径，面板脚注写明；
+- 只计首次写入：同一结果在后续请求里以缓存读取重发，那部分不算“省”；
+- 出错：组件返回 null，不影响会话流。
+
+### E. 落地计划（下一个 issue）
+
+1. `plugin/client.js`：抽 `summarizeSession(snapshot)` 纯函数；TailRow 与 DockRow 共用
+   `LightningIcon`；DockRow 用 `useProjection("tokenUsage")` + `useChat`；
+   CSS 用 `styles.insert` 注入（对齐 DSH 的 pill/dialog 视觉）。
+2. 客户端半无法在 Node 里单测（`window.__ModuleLoader__` + React 都是浏览器侧），
+   沿用现有做法：`node --check` + 真机造数验证。
+3. 约定：`plugin/package.json` 版本递增；安装后必须刷新页面才加载新 bundle。
+
+### F. 验收（设计阶段）
+
+- 两个面的形态、文案、交互、数据口径都写清楚，可直接照此落地；
+- 不新增 Host→Client 通道；
+- 本轮不改任何代码、不装插件。
+
+## 结论
+
+1. **两个面分工明确**：尾行回答“这一轮省了什么”，dock 回答“这个会话一共省了多少”；
+   尾行只读，dock 可点开明细。
+2. **不需要新通道**：`useProjection("tokenUsage")`、`useChat` 快照、占位符里的
+   `estimated_tokens`、回执头的 `source_bytes`、compaction 节点的 `shadowedTokenCount`
+   已经覆盖全部数字；DSH 自己的 `UsagePill` 就注册在同一个 dock 座位。
+3. **灰色闪电用内联 SVG + `currentColor`**，与 DSH 的线性图标同风格；
+   emoji 的黄色是字体渲染，CSS 改不掉。
+4. **百分比用“工具输出少写”口径**（收纳+回执 ÷ 工具输出总量），压缩单独列；
+   这样百分比不会被会话累计的缓存读取稀释。
+5. **本轮只出设计**；落地改动见「落地计划」，另开 issue 执行。
