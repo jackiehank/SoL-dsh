@@ -311,10 +311,10 @@ window.__ModuleLoader__.load({
       const label = t('pill', { tokens: compactNumber(saved), percent: percentText })
 
       const rows = [
+        [t('rowFusion'), t('fusionValue', { count: summary.fusion })],
         [t('rowPack'), `${summary.pack} · ${compactNumber(summary.packTokens)} tok`],
         [t('rowReceipt'), `${summary.receipt} · ${compactNumber(summary.receiptTokens)} tok`],
         [t('rowCompact'), `${summary.compact} · ${compactNumber(summary.compactTokens)} tok`],
-        [t('rowFusion'), t('fusionValue', { count: summary.fusion })],
         [t('rowPercent'), `${percentText}%`],
       ]
 
