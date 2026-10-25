@@ -1,7 +1,8 @@
 # @local/sol-dsh
 
-SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + 一个 Web GUI 的
-每轮状态行（Client 半），零外部依赖，四个机制默认全关。**配置键与上游 `sol-pi.json` 一致**，只有 8 个。
+SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + 两个 Web GUI
+状态面（Client 半：每轮尾行 + 输入框下方可点开的节省面板），零外部依赖，四个机制默认全关。
+**配置键与上游 `sol-pi.json` 一致**，只有 8 个。
 
 ## 开关（`cordis.patch.yml` 的 `config`）
 
@@ -51,26 +52,51 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 - **失败开放**：归档写失败、模型不可用/超时/输出不合法、监听器异常都保留原结果，只打
   `[sol-dsh]` 警告，并在 `evidence-preserving-reducer/ledger.jsonl` 记下原因（账本常开、KB 级）。
 
-## 每轮一行：turnTail（Client 半）
+## 两个状态面（Client 半）
 
-`plugin/client.js` 注册 `conversation.chat.turnTail`，在每轮结束、动作行（复制 / 点赞 / 用量 / 时间）之前
-渲染一行：
+`plugin/client.js` 注册两个座位，都不改 Host 半、不新增 Host→Client 通道。
+
+### 尾行：`conversation.chat.turnTail`
+
+每轮结束、动作行（复制 / 点赞 / 用量 / 时间）之前一行，灰色线性闪电 + 四类计数：
 
 ```
-⚡ 本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0
+本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0
 ```
 
-- 计数全部来自会话里本来就有的字面量：`[then_run:succeeded]`、占位符首行
-  `[large tool result replaced before it entered the context]`、`sol_pi_evidence_receipt_v1`、
-  `kind === 'compaction'` 的节点——不花模型 token，也不新增 Host→Client 通道；
-- **四计数全零时整条不渲染**，所以四个机制全关时界面没有任何变化；
+- 只读、不可点、没有悬停提示；
+- **四计数全零时不渲染**；
 - 排障开关：DevTools 里 `localStorage['sol-dsh:debug'] = '1'` 后刷新，零命中轮次也会显示
-  `⚡ sol-dsh 已加载（本轮无机制命中）`（或 `读不到会话快照`），并在控制台打印
+  `sol-dsh 已加载（本轮无机制命中）`（或 `读不到会话快照`），并在控制台打印
   `[sol-dsh] turn N keys M kinds …`；关掉用 `localStorage.removeItem('sol-dsh:debug')`。
+
+### 输入框下方：`conversation.composer.dock`
+
+常驻一行 `已省 12.3k tok · 16.8%`（和 DSH 自己的「Token 用量」同一座位），点击向上展开面板：
+
+```
+本会话                        34,567 tok
+────────────────────────────────────────
+收纳                3 · 9,800 tok
+回执                1 · 1,200 tok
+压缩                1 · 23,567 tok
+融合                2 次往返
+工具输出少写        16.8%
+```
+
+- 0 项也显示（不隐藏零行）；点外部 / Esc / 再次点击关闭；
+- 数字全部从会话快照算：
+  - 收纳 = 占位符 `estimated_tokens` - 占位符自身；
+  - 回执 = 回执头 `source_bytes` - 回执自身；
+  - 压缩 = compaction 节点的 `shadowedTokenCount`（`manual-compaction` 取 `data.compaction`）；
+  - 融合 = `[then_run:succeeded]` 次数，不折算 token；
+  - 百分比 = (收纳 + 回执) / (收纳 + 回执 + 工具结果实际写入 token)。
+- 口径是 4 字符 ≈ 1 token 的估算，只计首次写入、不含后续缓存读取；
+- 扫描范围是本会话**已加载**的轮次（快照分页时不含未加载页）。
 
 与上游的对应关系：上游 Pi 的 `tui.ts` 用 `ctx.ui.setStatus` + `ctx.ui.notify` 做 4 秒瞬时提示，
 DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡片标题也不可插（`presentCall`/`presentResult`
-在本 build 没有消费者），所以这里换成“每轮一行、可回看”的形态。
+在本 build 没有消费者），所以这里换成“每轮一行 + 可点开的会话累计”。
 
 ## 客户端踩坑（真机记录）
 
@@ -83,6 +109,9 @@ DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡�
 3. **工具结果在 `data.root`**：Chat 快照里没有 `tool-result` 节点，工具调用是 `kind: 'tool-call'`
    的节点，结果挂在 `data.root` 上（落定后才是 `kind: 'tool-result'` 的块），嵌套调用在 `subCalls`。
    压缩节点是 `compaction`／`manual-compaction`。
+4. **composer.dock 的 standard props 里也有 `useChat`**：DSH 自己的 `ActivityPill` 与 `UsagePill`
+   就注册在同一个座位，前者同时用 `useChat` + `useProjection`。`snapshot.timeline.turnOrder`
+   是轮次列表，配合 `locations.getTurn(turn)` / `nodes` 可扫全量（已加载）轮次。
 
 Client 半改动要**页面刷新**才生效（Host 侧重载带不上浏览器模块）。
 
