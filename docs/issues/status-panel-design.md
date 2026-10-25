@@ -81,6 +81,44 @@
    - 1：面板只读，配置继续放在 `cordis.patch.yml`。
    当前建议维持 1；若要做，先决定 2a 的依赖来源。
 
+## collect（第二轮：原生配置链，针对 DSH 0.2.1-rc.3）
+
+版本：DSH desktop/runtime `0.2.1-rc.3`，cordis `4.0.5`，schemastery `~3.18.5`。
+
+### 原生配置是这么串起来的
+
+1. 插件声明 `static Config = z.object({ ... .volatile() })`（schemastery）。cordis 的
+   `resolveConfig(runtime, config)` 用 `runtime.Config["~standard"].validate(config)` 校验并归一化。
+2. 默认 `settings.configure({ auto: true })`；`dsh-settings` 的 `describe()` 对每个 entry
+   调 `volatileForm(schema)`，**只保留带 volatile 的字段**，生成 `schema.toJSON()` 表单。
+3. 客户端 `configForms` 服务（`dsh-client-ui-settings` 提供）用 `get(entryId)` 返回
+   `ConfigFormController`，`set/unset/mutate` 排队写回 Host settings；Plugins 页的
+   `configure` 控件和 `plugins.bundle.config` 座位都消费它。
+4. 结论：**只要 Config 里有 volatile 字段，原生设置页就会自动生成表单**；自定义
+   `plugins.bundle.config` 只是换外观，不是必需。
+
+### 依赖问题
+
+- profile 里的本地 bundle 解析不到 `@deepseek-ai/schemastery`（`ERR_MODULE_NOT_FOUND`）。
+- 选项：
+  - **a（推荐）**：`plugin/package.json` 加 `"@deepseek-ai/schemastery": "~3.18.5"`，
+    由 `install_bundle` 的 pnpm 安装（需要 registry 与供应链策略允许）；
+  - b：vendor 一份 schemastery（需确认许可证与体积）；
+  - c：手写 Standard Schema + `toJSON/meta/dict` 适配层——`volatileForm` 会用
+    `new z(schema.toJSON())` 和 `z.object(dict)` 重建 schema，兼容面大，不推荐。
+
+### 实现成本与真正的难点
+
+- Host：把 8 个配置键写成 `Config`，四个机制布尔值加 `.volatile()`；
+  `apply` 改读 `config.actionFusion.get()` 这类 observable。
+- Client：0 改动，原生表单渲染开关。
+- **难点**：volatile 字段是“运行中可改”，而 `volatileForm` 会过滤掉非 volatile 字段——
+  也就是说**表单里能出现的字段必须 volatile**，改完要立即生效。我们现在的四个机制是在
+  `apply` 时一次性 `ctx.effect`/`ctx.on` 挂上去的；要让开关实时生效，得把每个机制改成
+  “跟随配置值的可挂载/卸载单元”（每个机制一个子 effect 或子 Context），否则会出现
+  “开关拨了但机制没变”。
+- 兼容性：`resolveConfig` 不再手写，未知键/类型错误的文案会变；README 的配置表要同步。
+
 ## 结论
 
 1. **排法定 A**：次数放进标签（`收纳（10 次）` → `28.3k tok`），保留 DSH 的两列
