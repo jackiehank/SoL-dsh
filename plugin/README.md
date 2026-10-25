@@ -33,23 +33,23 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 
 ## 行为要点
 
-- **Action Fusion**：在内建 `edit`/`write` 的参数上追加可选
+- **动作融合（Action Fusion）**：在内建 `edit`/`write` 的参数上追加可选
   `then_run: {command, timeout?, workdir?, description?}`。编辑成功→命令通过 `pwsh`
   （没有则 `bash`）执行，走同一套审批、沙箱、超时与输出截断；编辑失败→命令不执行，
   错误里带 `[then_run:skipped]`；命令非零退出→结果里追加 `[then_run:failed]` 与命令输出，
   **编辑不回滚**。命令报文的成功/失败看 `[then_run:...]` 与 `[exit code: N]`。
-- **ObservationPack**：`tools/post-execute` 先把结果落日志的机会截下来——超过 10 KiB、纯文本、
+- **长输出寄存（ObservationPack）**：`tools/post-execute` 先把结果落日志的机会截下来——超过 10 KiB、纯文本、
   非错误、且不是 reducer 回执的结果，替换成带 `id`/原始尺寸/首尾完整行的占位符；`value`
   保持不动。原文按内容寻址写到 `<storageRoot>/observation-pack/objects/<id>.txt`，已存在则逐字节校验。
   `obs_recall {id, offset}` 返回一页（UTF-8 边界安全）与 `next_offset`/`eof`。
-- **Evidence-Preserving Reducer**：只对 `pwsh`/`bash` 的诊断类命令（go test / cargo / pytest /
+- **诊断日志回执（Evidence-Preserving Reducer）**：只对 `pwsh`/`bash` 的诊断类命令（go test / cargo / pytest /
   npm test / make …）动手。正文 ≥ 4 KiB 且不含疑似密钥时，先把原文按内容寻址归档，
   再用 `ctx.llm` 做一次受限调用，要求模型只输出一个 JSON 回执；回执里的每条引文必须**逐字连续**
   出现在归档正文里，schema/source_sha256/status/证据条数/长度任何一项不符、失败日志缺 failure 证据、
   或回执不比原文小，都整体回退到原文。回执首行是 `sol_pi_evidence_receipt_v1`，带
   `source_artifact` 供按字节复核。归约调用固定温度 0、思考等级用适配器默认（实测
   `deepseek-v4.1-flash` 可用；需要更强模型就显式配 provider/model）。
-- **Online Context Compact**：观察内建 `todo_write`，只有“旧步骤变 completed”才产生完成边界；
+- **在线上下文压缩（Online Context Compact）**：观察内建 `todo_write`，只有“旧步骤变 completed”才产生完成边界；
   在 `agent/pre-step` 里用 `ctx.tokenMeter.measure(session).nodes` 选区间（system 不入区间、按
   内部默认 20k token 留尾），经济性成立才调 `ctx.compaction.compactRegion`——压缩后同一
   turn 的下一 step 自然继续，不注入“继续工作”的消息。
@@ -66,7 +66,7 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 每轮结束、动作行（复制 / 点赞 / 用量 / 时间）之前一行，灰色线性闪电 + 四类计数：
 
 ```
-本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0
+本轮：融合 1 · 寄存 1 · 回执 0 · 压缩 0
 ```
 
 - 只读、不可点、没有悬停提示；
@@ -83,7 +83,7 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 本会话                  34,567 tok
 ──────────────────────────────────
 融合                    2 次往返
-收纳（3 次）            9,800 tok
+寄存（3 次）            9,800 tok
 回执（1 次）            1,200 tok
 压缩（1 次）            23,567 tok
 工具输出少写            16.8%
@@ -93,11 +93,11 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 - 数字来自 `plugin/lib/savings.js` 注册的 `solDshStats` 投影（`ctx.sessionProjections`）：
   它按 `session/event` 折整条会话日志，**不受快照分页、重启、机制开关影响**；
   投影不可用时退化为扫描已加载快照。
-  - 收纳 = 占位符 `estimated_tokens` - 占位符自身；
+  - 寄存 = 占位符 `estimated_tokens` - 占位符自身；
   - 回执 = 回执头 `source_bytes` - 回执自身；
   - 压缩 = `compaction/summary` 的 `shadowedTokenCount`；
   - 融合 = `[then_run:succeeded]` 次数，不折算 token；
-  - 百分比 = (收纳 + 回执) / (收纳 + 回执 + 工具结果实际写入 token)。
+  - 百分比 = (寄存 + 回执) / (寄存 + 回执 + 工具结果实际写入 token)。
 - 口径是 4 字符 ≈ 1 token 的估算，只计首次写入、不含后续缓存读取。
 - 投影 key 与客户端常量保持一致（`solDshStats`）；老版本 DSH 没有
   `sessionProjections` 时静默跳过注册。

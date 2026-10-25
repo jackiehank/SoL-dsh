@@ -39,10 +39,10 @@ export const Config = z.object({
 export const inject = ['tools']
 
 const MECHANISMS = Object.freeze({
-  actionFusion: 'Action Fusion（edit/write 的 then_run）',
-  observationPack: 'ObservationPack（大结果句柄 + obs_recall）',
-  evidencePreservingReducer: 'Evidence-Preserving Reducer（诊断日志回执）',
-  onlineContextCompact: 'Online Context Compact（计划完成点压缩）',
+  actionFusion: 'Action Fusion',
+  observationPack: 'ObservationPack',
+  evidencePreservingReducer: 'Evidence-Preserving Reducer',
+  onlineContextCompact: 'Online Context Compact',
 })
 
 /**

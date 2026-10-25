@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "SoL-dsh Efficiency Pack",
-    "description": "Opt-in mechanisms ported from NVlabs/SoL-Pi: fused edit/write follow-up commands, and archived large tool results with exact paged recall. Every mechanism is disabled by default."
+    "description": "Opt-in efficiency mechanisms ported from NVlabs/SoL-Pi: Action Fusion (run a follow-up command after edit/write), ObservationPack (archive large results and recall them by page), Evidence-Preserving Reducer (turn build/test logs into verbatim-checkable receipts), and Online Context Compact (compaction at plan boundaries). All mechanisms are off by default."
   }
 }

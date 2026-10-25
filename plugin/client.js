@@ -5,11 +5,11 @@
  * 2. `conversation.composer.dock` —— 输入框下方常驻的“本会话已省”，点击可展开明细。
  *
  * 所有数字都从会话快照算：不新增 Host→Client 通道，也不花模型 token。
- * - 收纳：占位符里的 `estimated_tokens` - 占位符自身；
+ * - 寄存：占位符里的 `estimated_tokens` - 占位符自身；
  * - 回执：回执头的 `source_bytes` - 回执自身；
  * - 压缩：compaction 节点的 `shadowedTokenCount`；
  * - 融合：`[then_run:succeeded]` 次数（不折算 token）；
- * - 百分比：(收纳 + 回执) / (收纳 + 回执 + 工具输出实际写入 token)。
+ * - 百分比：(寄存 + 回执) / (寄存 + 回执 + 工具输出实际写入 token)。
  *
  * 估算口径是 4 字符 ≈ 1 token，只计首次写入，不含后续缓存读取。
  */
@@ -241,7 +241,7 @@ window.__ModuleLoader__.load({
       } else if (typeof t === 'function') {
         label = t('tail', counts)
       } else {
-        label = `本轮：融合 ${counts.fusion} · 收纳 ${counts.pack} · 回执 ${counts.receipt} · 压缩 ${counts.compact}`
+        label = `本轮：融合 ${counts.fusion} · 寄存 ${counts.pack} · 回执 ${counts.receipt} · 压缩 ${counts.compact}`
       }
 
       return h(
@@ -477,19 +477,19 @@ window.__ModuleLoader__.load({
           () =>
             ctx.locale.register(NS, {
               zh: {
-                tail: '本轮：融合 {fusion} · 收纳 {pack} · 回执 {receipt} · 压缩 {compact}',
+                tail: '本轮：融合 {fusion} · 寄存 {pack} · 回执 {receipt} · 压缩 {compact}',
                 pill: '已省 {tokens} tok · {percent}%',
                 pillAria: 'sol-dsh 本会话节省明细',
                 configTitle: '机制开关',
                 configHint: '开关立即生效，并写入 profile 配置。',
                 configLoading: '正在读取配置…',
                 configUnavailable: 'Host 没有暴露该配置命名空间，请重载插件或检查 DSH 版本。',
-                toggleFusion: 'Action Fusion · edit/write 的 then_run',
-                togglePack: 'ObservationPack · 大结果句柄',
-                toggleReducer: 'Evidence-Preserving Reducer · 回执',
-                toggleCompact: 'Online Context Compact · 完成点压缩',
+                toggleFusion: '动作融合（Action Fusion）· 编辑/写入后在同一调用里跑命令',
+                togglePack: '长输出寄存（ObservationPack）· 大结果存本地，凭句柄分页取回',
+                toggleReducer: '诊断日志回执（Evidence-Preserving Reducer）· 构建/测试日志压成逐字可核验的回执',
+                toggleCompact: '在线上下文压缩（Online Context Compact）· 计划步骤完成点触发压缩',
                 panelTitle: '本会话',
-                rowPack: '收纳',
+                rowPack: '寄存',
                 rowReceipt: '回执',
                 rowCompact: '压缩',
                 rowFusion: '融合',
@@ -499,22 +499,22 @@ window.__ModuleLoader__.load({
                 footnote: '估算：4 字符 ≈ 1 token；只计首次写入，不含后续缓存读取。',
               },
               en: {
-                tail: 'This turn: fused {fusion} · packed {pack} · receipts {receipt} · compacted {compact}',
+                tail: 'This turn: fusion {fusion} · pack {pack} · reducer {receipt} · compact {compact}',
                 pill: 'Saved {tokens} tok · {percent}%',
                 pillAria: 'sol-dsh session savings details',
                 configTitle: 'Mechanism switches',
                 configHint: 'Switch changes apply immediately and persist to the profile config.',
                 configLoading: 'Reading configuration…',
                 configUnavailable: 'The Host does not expose this configuration namespace; reload the plugin or check the DSH version.',
-                toggleFusion: 'Action Fusion · then_run for edit/write',
-                togglePack: 'ObservationPack · large-result handles',
-                toggleReducer: 'Evidence-Preserving Reducer · receipts',
-                toggleCompact: 'Online Context Compact · completion compaction',
+                toggleFusion: 'Action Fusion · run a command after the edit',
+                togglePack: 'ObservationPack · large results become local handles',
+                toggleReducer: 'Evidence-Preserving Reducer · build/test logs become verbatim receipts',
+                toggleCompact: 'Online Context Compact · compaction at plan boundaries',
                 panelTitle: 'This session',
-                rowPack: 'Packed',
-                rowReceipt: 'Receipts',
-                rowCompact: 'Compacted',
-                rowFusion: 'Fused',
+                rowPack: 'Pack',
+                rowReceipt: 'Reducer',
+                rowCompact: 'Compact',
+                rowFusion: 'Fusion',
                 rowPercent: 'Tool output saved',
                 rowWithCount: '{label} ({count}×)',
                 fusionValue: '{count} round-trips',
