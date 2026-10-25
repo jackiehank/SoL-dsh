@@ -100,8 +100,8 @@ function createStatusTool(ctx, fusion, diagnosticsInfo) {
 /**
  * 把 volatile 字段的可观察值拆成普通值（cordis 会按 Config 把它们包一层）。
  *
- * 例：`config.actionFusion.get()` → `config.actionFusion`。开关接线（实时挂载/卸载）
- * 是下一步；当前先把值读出来，行为与旧配置一致。
+ * 例：`config.actionFusion.get()` → `config.actionFusion`。开关拨动后 Loader 只会
+ * 改写 observable、不会重跑 apply；所以这里每次 sync 都重新读一遍。
  */
 function plainValues(raw) {
   if (raw === null || typeof raw !== 'object') return raw
@@ -115,14 +115,17 @@ function plainValues(raw) {
 /**
  * 装配入口。
  *
+ * 四个机制各自挂在一个子插件（子 fiber）上：开关变化时只销毁/重建受影响的机制，
+ * 不去重载整个插件。切换由 Loader 的 `loader/volatile-update` 事件驱动。
+ *
  * @param ctx - 插件上下文；所有注册都挂在它（或 agent scope）的 effect 名下。
  * @param rawConfig - cordis.patch.yml 中该行 `config` 的原始值。
  */
 export function apply(ctx, rawConfig) {
-  const config = resolveConfig(plainValues(rawConfig))
-  const active = []
   const diagnosticsInfo = {}
+  const mounts = new Map()
   let fusion
+  let statusToolRegistered = false
 
   // 会话级节省统计与开关无关：即使四个机制全关，历史累计也要能显示。
   // 用 inject 等 sessionProjections 就绪；没有这个服务的 profile 里静默跳过。
@@ -133,36 +136,77 @@ export function apply(ctx, rawConfig) {
     )
   })
 
-  if (config.actionFusion) {
-    fusion = attachActionFusion(ctx, config)
-    active.push('actionFusion')
-  }
-  if (config.observationPack) {
-    attachObservationPack(ctx, config)
-    active.push('observationPack')
-  }
-  // 顺序有意：ObservationPack 在前（它先 next()），Reducer 在后才能看到原始长日志，
-  // 并把回执交回给 ObservationPack 判断“是否还需要打包”。
-  if (config.evidencePreservingReducer) {
-    const reducer = attachEvidencePreservingReducer(ctx, config)
-    if (reducer !== undefined) {
-      diagnosticsInfo.reducer = { provider: reducer.route.provider, model: reducer.route.model }
-      active.push('evidencePreservingReducer')
+  const unmount = (key) => {
+    const dispose = mounts.get(key)
+    if (dispose === undefined) return
+    mounts.delete(key)
+    try {
+      dispose()
+    } catch (error) {
+      ctx.logger?.warn?.(`[sol-dsh] unmount ${key} failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  if (config.onlineContextCompact) {
-    const compact = attachOnlineContextCompact(ctx, config)
-    if (compact !== undefined) active.push('onlineContextCompact')
-  }
-  if (config.diagnostics && fusion !== undefined) {
-    ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion, diagnosticsInfo)))
+
+  const unmountAll = () => {
+    for (const key of [...mounts.keys()]) unmount(key)
+    fusion = undefined
   }
 
-  if (active.length === 0) {
-    ctx.logger?.info?.('[sol-dsh] 四个机制均未开启（opt-in），只保留会话节省投影')
-    return
+  const mount = (key, attach) => {
+    const handle = ctx.plugin({
+      name: `sol-dsh:${key}`,
+      apply: (child) => attach(child),
+    })
+    mounts.set(key, () => {
+      Promise.resolve(handle.dispose?.()).catch(() => {})
+    })
   }
-  ctx.logger?.info?.(`[sol-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
+
+  const sync = () => {
+    unmountAll()
+    const config = resolveConfig(plainValues(rawConfig))
+    const active = []
+
+    if (config.actionFusion) {
+      mount('actionFusion', (child) => {
+        fusion = attachActionFusion(child, config)
+      })
+      active.push('actionFusion')
+    }
+    if (config.observationPack) {
+      mount('observationPack', (child) => attachObservationPack(child, config))
+      active.push('observationPack')
+    }
+    // 顺序有意：ObservationPack 在前（它先 next()），Reducer 在后才能看到原始长日志，
+    // 并把回执交回给 ObservationPack 判断“是否还需要打包”。
+    if (config.evidencePreservingReducer) {
+      mount('evidencePreservingReducer', (child) => {
+        const reducer = attachEvidencePreservingReducer(child, config)
+        if (reducer !== undefined) {
+          diagnosticsInfo.reducer = { provider: reducer.route.provider, model: reducer.route.model }
+        }
+      })
+      active.push('evidencePreservingReducer')
+    }
+    if (config.onlineContextCompact) {
+      mount('onlineContextCompact', (child) => attachOnlineContextCompact(child, config))
+      active.push('onlineContextCompact')
+    }
+    if (config.diagnostics && fusion !== undefined && !statusToolRegistered) {
+      statusToolRegistered = true
+      ctx.effect(() => ctx.tools.register(createStatusTool(ctx, fusion, diagnosticsInfo)))
+    }
+
+    if (active.length === 0) {
+      ctx.logger?.info?.('[sol-dsh] 四个机制均未开启（opt-in），只保留会话节省投影')
+      return
+    }
+    ctx.logger?.info?.(`[sol-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)
+  }
+
+  sync()
+  // 开关只在 volatile 字段上；Loader 更新 observable 后发这个事件，我们按新值重挂机制。
+  ctx.on('loader/volatile-update', () => sync())
 }
 
 
