@@ -25,14 +25,20 @@ window.__ModuleLoader__.load({
     const RECEIPT_MARK = 'sol_pi_evidence_receipt_v1'
 
     /** 结果节点的文本拼接（只读）。 */
+    /**
+     * 结果节点的文本拼接（只读）。
+     *
+     * 注意：会话快照里的内容块用 `kind` 判别（ui-chat 自己的渲染器就写 `block.kind === "text"`），
+     * 而宿主侧的工具结果是 `type`。两种形状都接受，免得在浏览器里恒为空。
+     */
     function textOf(node) {
       const content = node?.content
       if (!Array.isArray(content)) return ''
       let out = ''
       for (const block of content) {
-        if (block !== null && typeof block === 'object' && block.type === 'text' && typeof block.text === 'string') {
-          out += `${block.text}\n`
-        }
+        if (block === null || typeof block !== 'object') continue
+        const isText = block.kind === 'text' || block.type === 'text'
+        if (isText && typeof block.text === 'string') out += `${block.text}\n`
       }
       return out
     }
