@@ -39,8 +39,8 @@
 | 机制 | 中文全名 | 英文全名 | 中文短名 | 英文短名 |
 | --- | --- | --- | --- | --- |
 | `actionFusion` | 动作融合 | Action Fusion | 融合 | Fusion |
-| `observationPack` | 观测收纳 | ObservationPack | 收纳 | Pack |
-| `evidencePreservingReducer` | 证据回执 | Evidence-Preserving Reducer | 回执 | Receipt |
+| `observationPack` | 长输出寄存 | ObservationPack | 寄存 | Pack |
+| `evidencePreservingReducer` | 诊断日志回执 | Evidence-Preserving Reducer | 回执 | Receipt |
 | `onlineContextCompact` | 在线上下文压缩 | Online Context Compact | 压缩 | Compact |
 
 ## 各展示面的详略
@@ -55,17 +55,21 @@
 
 - 中文：`动作融合（Action Fusion）· 编辑/写入后在同一调用里跑命令`；
 - 英文：`Action Fusion · run a command after the edit`；
-- 统一成「全名（英文全名）· 一句短说明」，四行结构一致。
+- 四行统一成「全名（英文全名）· 一句短说明」，另外三条：
+  - `长输出寄存（ObservationPack）· 大结果存本地，凭句柄分页取回`；
+  - `诊断日志回执（Evidence-Preserving Reducer）· 构建/测试日志压成逐字可核验的回执`；
+  - `在线上下文压缩（Online Context Compact）· 计划步骤完成点触发压缩`；
+- 英文界面同样保留全名，短说明用英文（`Receipt` 只用于尾行/面板，不用于全名）。
 
 ### 尾行（最简）
 
-- 中文：`本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0`；
+- 中文：`本轮：融合 1 · 寄存 1 · 回执 0 · 压缩 0`；
 - 英文：`This turn: fusion 1 · pack 1 · receipt 0 · compact 0`——
   用名词单数，不用 `fused/packed` 这类过去分词。
 
 ### 面板（最简）
 
-- 中文：`融合 / 收纳 / 回执 / 压缩`；
+- 中文：`融合 / 寄存 / 回执 / 压缩`；
 - 英文：`Fusion / Pack / Receipt / Compact`；
 - 数值列、`工具输出少写` / `Tool output saved` 不变。
 
@@ -77,7 +81,7 @@
 ### 包元数据
 
 - `locale/zh.json` 与 `locale/en.json` 的 `description` 补全四个机制
-  （现在只提了动作融合与观测收纳）。
+  （现在只提了动作融合与长输出寄存）。
 
 ## i18n 规则
 
@@ -91,10 +95,14 @@
 
 ## 落地清单（确认后）
 
-1. `plugin/client.js`：设置页四个 toggle 文案改成统一结构；英文尾行改名词单数；
-2. `plugin/README.md`：四个机制标题补中文全名；
-3. `plugin/lib/index.js`：`MECHANISMS` 用英文全名；
-4. `plugin/locale/*.json`：description 补全四个机制；
+1. `plugin/client.js`：
+   - 设置页四个 toggle 文案改成「中文全名（英文全名）· 一句说明」；
+   - 尾行/面板短名：中文 `融合/寄存/回执/压缩`，英文 `fusion/pack/receipt/compact`
+     （尾行名词单数，面板首字母大写）；
+   - `rowPack` 中文由「收纳」改「寄存」，英文保持 `Pack`；
+2. `plugin/README.md`：四个机制标题补中文全名；示例里的「收纳」改「寄存」；
+3. `plugin/lib/index.js`：`MECHANISMS` 用英文全名（`Action Fusion` 等），消息正文中文；
+4. `plugin/locale/*.json`：`description` 补全四个机制；
 5. 版本递增，刷新页面验收。
 
 ## collect（第二轮：两个译名的业内用法）
@@ -130,6 +138,8 @@
 
 ### 推荐
 
+> 这是第二轮的候选推荐，最终未采用——定名见文末「结论」。
+
 - **观测外置（ObservationPack）**，短名「外置」：贴 output externalization 的业内说法，
   短名与「压缩」区分明显，也避开「归档 / 归约」的撞车；
 - **留证归约（Evidence-Preserving Reducer）**，短名「归约」：四字同时覆盖
@@ -137,12 +147,13 @@
 
 ## 结论
 
-> 注：本节的「观测收纳 / 证据回执」是第一轮定名；两个译名已被上面的第二轮 collect 取代，
-> 待选定后统一更新。
-
-1. **定名**：动作融合 / 观测收纳 / 证据回执 / 在线上下文压缩；短名固定为
-   融合、收纳、回执、压缩（英文 Fusion / Pack / Receipt / Compact）。
-2. **详略**：README 全名 + 细节；设置页全名（英文）+ 一句说明；尾行/面板只用短名。
-3. **语言**：UI 全部走 locale；中文界面仅设置页保留英文全名；英文界面不用过去分词；
-   README 中文、首次出现给英文全名。
-4. 本轮只定规范，不改代码；确认后按「落地清单」一次改完。
+1. **定名**：动作融合 / 长输出寄存 / 诊断日志回执 / 在线上下文压缩；
+   短名 **融合 / 寄存 / 回执 / 压缩**，英文短名 **Fusion / Pack / Receipt / Compact**。
+2. **详略**：README 全名 + 细节；设置页「中文全名（英文全名）+ 一句说明」；
+   尾行/面板只用短名。
+3. **语言**：UI 全部走 locale；中文界面只有设置页保留英文全名；英文界面不用过去分词；
+   README 中文、机制首次出现写「中文（English）」。
+4. **为什么不叫「归约」/「摘要」**：用户看到的是产物（回执），「诊断日志」已把范围锁死在
+   构建/测试日志；`Evidence-Preserving Reducer` 保留在设置页/README 里对照上游。
+   普通「摘要」会暗示有损概括，而回执的卖点是每句都能逐字核对。
+5. 本轮只定规范，不改代码；下一步按「落地清单」一次实现。
