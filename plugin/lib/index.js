@@ -5,6 +5,7 @@
  * 配置非法（未知键、类型错误）在装配阶段直接抛错，避免“以为开了其实没开”。
  */
 
+import z from '@deepseek-ai/schemastery'
 import { resolveConfig } from './config.js'
 import { attachActionFusion } from './action-fusion.js'
 import { attachObservationPack } from './observation-pack.js'
@@ -14,6 +15,25 @@ import { createStatsProjectionDefinition } from './savings.js'
 
 /** Cordis 函数插件名；与包名一致，便于在日志和插件列表里对号入座。 */
 export const name = 'sol-dsh'
+
+/**
+ * 插件配置 schema。
+ *
+ * 声明 `Config` 后，DSH 设置页会用 `volatileForm` 自动生成表单：带 `.volatile()` 的字段
+ * 会出现在表单里并可运行时修改。`version` 不开放编辑，所以不加 volatile。
+ *
+ * 注意：volatile 字段在 `apply` 里拿到的是可观察值（用 `.get()` 读取），见 `plainValues`。
+ */
+export const Config = z.object({
+  version: z.number().default(1),
+  actionFusion: z.boolean().default(false).volatile(),
+  observationPack: z.boolean().default(false).volatile(),
+  evidencePreservingReducer: z.boolean().default(false).volatile(),
+  evidencePreservingReducerProvider: z.string().default('').volatile(),
+  evidencePreservingReducerModel: z.string().default('').volatile(),
+  onlineContextCompact: z.boolean().default(false).volatile(),
+  cacheWriteReadRatio: z.number().default(12.5).volatile(),
+})
 
 /** 依赖工具注册表；没有 tools 服务的 profile 里本插件保持不激活。 */
 export const inject = ['tools']
@@ -78,13 +98,28 @@ function createStatusTool(ctx, fusion, diagnosticsInfo) {
 }
 
 /**
+ * 把 volatile 字段的可观察值拆成普通值（cordis 会按 Config 把它们包一层）。
+ *
+ * 例：`config.actionFusion.get()` → `config.actionFusion`。开关接线（实时挂载/卸载）
+ * 是下一步；当前先把值读出来，行为与旧配置一致。
+ */
+function plainValues(raw) {
+  if (raw === null || typeof raw !== 'object') return raw
+  const out = {}
+  for (const [key, value] of Object.entries(raw)) {
+    out[key] = value !== null && typeof value === 'object' && typeof value.get === 'function' ? value.get() : value
+  }
+  return out
+}
+
+/**
  * 装配入口。
  *
  * @param ctx - 插件上下文；所有注册都挂在它（或 agent scope）的 effect 名下。
  * @param rawConfig - cordis.patch.yml 中该行 `config` 的原始值。
  */
 export function apply(ctx, rawConfig) {
-  const config = resolveConfig(rawConfig)
+  const config = resolveConfig(plainValues(rawConfig))
   const active = []
   const diagnosticsInfo = {}
   let fusion
