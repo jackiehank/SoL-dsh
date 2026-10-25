@@ -115,6 +115,19 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 排障用座位：`conversation.composer.dock` 是模板里验证过的 list 座位。
+     * 只在调试开关打开时渲染一行，用来区分“Client 半没加载”和“turnTail 座位没注册上”。
+     */
+    function DebugDock() {
+      if (!debugEnabled()) return null
+      return h(
+        'div',
+        { style: { fontSize: '11px', lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)' } },
+        '⚡ sol-dsh 客户端已加载（debug）',
+      )
+    }
+
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
@@ -123,13 +136,20 @@ window.__ModuleLoader__.load({
           en: { tail: '⚡ this turn: fused {fusion} · packed {pack} · receipts {receipt} · compacted {compact}' },
         }), 'sol-dsh: turn-tail dictionary')
 
-        // 这个座位在运行时按 chain 渲染（ui-chat 的 TurnTailNodeView 用 renderSlotChain 调它），
-        // 注册键是 `select` 而不是 list 的 `id`：select 拿到 owner 即接受，是否显示由组件自己决定。
+        // 运行时校验要求这个座位必须带 `id`（`list slot "…" requires options.id`），
+        // 由 owner 的 chain 渲染逐个取用；显不显示由组件自己返回 null 决定。
         ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
           name: 'conversation.chat.turnTail',
-          select: (owner) => owner,
+          id: 'sol-dsh',
+          order: 5,
           locale: NS,
         }, TailRow))
+
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
+          id: 'sol-dsh-debug',
+          order: 90,
+        }, DebugDock))
       },
     }
   },
