@@ -15,7 +15,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/sol-dsh',
+  id: '@jackiehank/sol-dsh',
   factory(require) {
     const React = require('react')
     const h = React.createElement
@@ -566,7 +566,7 @@ window.__ModuleLoader__.load({
         ctx.effect(
           () =>
             ctx.slots.inject('plugins.bundle.config', () => {
-              const disposers = ['sol-dsh', '@local/sol-dsh'].map((key) =>
+              const disposers = ['sol-dsh', '@jackiehank/sol-dsh'].map((key) =>
                 ctx.slots.register(
                   {
                     name: 'plugins.bundle.config',

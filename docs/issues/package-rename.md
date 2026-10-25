@@ -88,3 +88,11 @@
    需要改的只有包名、Loader 行 name、Client 模块 id、bundle config key 和当前文档。
 3. **唯一外部前置是 npm scope**（只在要发 npm 时需要）；GitHub 安装不受影响。
 4. 建议作为 `0.9.0` 的 breaking change 落地；本轮只出方案，不改代码。
+
+## 落地
+
+- `package.json`：`name` → `@jackiehank/sol-dsh`，版本 `0.9.0`；
+- `cordis.patch.yml`：插入行 `name` 同步；
+- `client.js`：模块 id 与 `plugins.bundle.config` 的第二个 key 同步；
+- `README.md` 配置示例、`docs/plugin.md` 标题同步；
+- profile 迁移按「迁移步骤」执行（覆盖行 name → remove 旧包 → 安装新包 → 刷新）。

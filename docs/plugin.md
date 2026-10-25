@@ -1,4 +1,4 @@
-# @local/sol-dsh
+# @jackiehank/sol-dsh
 
 SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + Client 半
 （每轮尾行、输入框下方面板、设置页开关），四个机制默认全关。

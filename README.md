@@ -48,7 +48,7 @@ github:jackiehank/SoL-dsh
 
 ```yaml
 - id: sol-dsh
-  name: '@local/sol-dsh'
+  name: '@jackiehank/sol-dsh'
   config:
     version: 1
     actionFusion: false
