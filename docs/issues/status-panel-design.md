@@ -60,6 +60,27 @@
 | 3 | 设置页（`settings.section`） | 高 | 整页开发，收益与 2 相同 |
 | 4 | 面板里直接放四个开关 | 中高 | 持久化同 2，且把“读数”和“控制”混在一起；DSH 自己的用量面板是只读的 |
 
+## test 验证（图形化开关是否值得做）
+
+1. **座位确实存在**：Plugins 页由 `plugin-manager` 客户端渲染
+   `renderSlot("plugins.bundle.config", { view: "page" }, { entryKey: pkg.name })`，
+   所以 bundle 可以在自己的页面里放配置区。
+2. **表单数据来自插件 Config schema**：`dsh-settings` 用插件的
+   `entry.fiber.config` / `runtime.Config` 生成 `schema.toJSON()` 表单；
+   没有 `Config` 的插件不会出现在 `configForms.describe()` 里。
+3. **我们的插件没有 `Config`**：只有手写的 `resolveConfig` 校验，因此 Plugins 页不会给出
+   任何可编辑控件——开关不是“注册一个座位”就有的。
+4. **客户端服务可用**：`plugin-manager` 客户端 `inject` 里有 `configForms`，
+   可用 `ctx.configForms.get(id)` + `SettingsFormModel` 读写表单。
+5. **依赖验证**：在 `plugin/` 下执行 `import('@deepseek-ai/schemastery')` 与 `import('zod')`
+   都返回 `ERR_MODULE_NOT_FOUND`——profile 里的本地 bundle 拿不到 DSH 安装目录里的包。
+6. **结论**：图形化开关可做，但需要额外成本：
+   - 2a：给插件加 schemastery `Config`（8 个键 + volatile），再注册
+     `plugins.bundle.config`；**需要新增依赖**或自带 schema 适配层；
+   - 2b：自建 RPC/路由 + 自绘配置页；成本更高；
+   - 1：面板只读，配置继续放在 `cordis.patch.yml`。
+   当前建议维持 1；若要做，先决定 2a 的依赖来源。
+
 ## 结论
 
 1. **排法定 A**：次数放进标签（`收纳（10 次）` → `28.3k tok`），保留 DSH 的两列
