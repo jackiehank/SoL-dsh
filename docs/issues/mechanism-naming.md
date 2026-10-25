@@ -40,7 +40,7 @@
 | --- | --- | --- | --- | --- |
 | `actionFusion` | 动作融合 | Action Fusion | 融合 | Fusion |
 | `observationPack` | 长输出寄存 | ObservationPack | 寄存 | Pack |
-| `evidencePreservingReducer` | 诊断日志回执 | Evidence-Preserving Reducer | 回执 | Receipt |
+| `evidencePreservingReducer` | 诊断日志回执 | Evidence-Preserving Reducer | 回执 | Reducer |
 | `onlineContextCompact` | 在线上下文压缩 | Online Context Compact | 压缩 | Compact |
 
 ## 各展示面的详略
@@ -59,18 +59,19 @@
   - `长输出寄存（ObservationPack）· 大结果存本地，凭句柄分页取回`；
   - `诊断日志回执（Evidence-Preserving Reducer）· 构建/测试日志压成逐字可核验的回执`；
   - `在线上下文压缩（Online Context Compact）· 计划步骤完成点触发压缩`；
-- 英文界面同样保留全名，短说明用英文（`Receipt` 只用于尾行/面板，不用于全名）。
+- 英文界面同样保留全名，短说明用英文；英文短名与全名的中心词一致
+  （`Fusion` / `Pack` / `Reducer` / `Compact`）。
 
 ### 尾行（最简）
 
 - 中文：`本轮：融合 1 · 寄存 1 · 回执 0 · 压缩 0`；
-- 英文：`This turn: fusion 1 · pack 1 · receipt 0 · compact 0`——
+- 英文：`This turn: fusion 1 · pack 1 · reducer 0 · compact 0`——
   用名词单数，不用 `fused/packed` 这类过去分词。
 
 ### 面板（最简）
 
 - 中文：`融合 / 寄存 / 回执 / 压缩`；
-- 英文：`Fusion / Pack / Receipt / Compact`；
+- 英文：`Fusion / Pack / Reducer / Compact`；
 - 数值列、`工具输出少写` / `Tool output saved` 不变。
 
 ### 日志与诊断
@@ -97,7 +98,7 @@
 
 1. `plugin/client.js`：
    - 设置页四个 toggle 文案改成「中文全名（英文全名）· 一句说明」；
-   - 尾行/面板短名：中文 `融合/寄存/回执/压缩`，英文 `fusion/pack/receipt/compact`
+   - 尾行/面板短名：中文 `融合/寄存/回执/压缩`，英文 `fusion/pack/reducer/compact`
      （尾行名词单数，面板首字母大写）；
    - `rowPack` 中文由「收纳」改「寄存」，英文保持 `Pack`；
 2. `plugin/README.md`：四个机制标题补中文全名；示例里的「收纳」改「寄存」；
@@ -148,12 +149,12 @@
 ## 结论
 
 1. **定名**：动作融合 / 长输出寄存 / 诊断日志回执 / 在线上下文压缩；
-   短名 **融合 / 寄存 / 回执 / 压缩**，英文短名 **Fusion / Pack / Receipt / Compact**。
+   中文短名 **融合 / 寄存 / 回执 / 压缩**；英文短名与全名中心词一致：
+   **Fusion / Pack / Reducer / Compact**。
 2. **详略**：README 全名 + 细节；设置页「中文全名（英文全名）+ 一句说明」；
    尾行/面板只用短名。
 3. **语言**：UI 全部走 locale；中文界面只有设置页保留英文全名；英文界面不用过去分词；
    README 中文、机制首次出现写「中文（English）」。
-4. **为什么不叫「归约」/「摘要」**：用户看到的是产物（回执），「诊断日志」已把范围锁死在
-   构建/测试日志；`Evidence-Preserving Reducer` 保留在设置页/README 里对照上游。
-   普通「摘要」会暗示有损概括，而回执的卖点是每句都能逐字核对。
+4. **中英短名可以不同**：中文按用户看到的产物叫「回执」；英文与全名
+   `Evidence-Preserving Reducer` 统一用 `Reducer`，避免同一语言里名词/动词混杂。
 5. 本轮只定规范，不改代码；下一步按「落地清单」一次实现。
