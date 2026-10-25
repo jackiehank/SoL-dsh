@@ -123,6 +123,16 @@ DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡�
 
 Client 半改动要**页面刷新**才生效（Host 侧重载带不上浏览器模块）。
 
+## Host 踩坑（真机记录）
+
+1. **子插件的 `apply` 必须返回 `undefined`**：机制挂在 `ctx.plugin({ apply })` 的子 fiber 上时，
+   写成 `apply: (child) => attach(child)` 会把 attach 的返回值交给 Cordis 当插件实例，
+   结果机制看起来挂上了、`tools/post-execute` 却不触发。用块体 `{ attach(child) }` 即可。
+2. **volatile 开关的事件**：Loader 改完 volatile 字段后发 `loader/volatile-update`（参数是
+   `paths`），监听它重挂机制；不要指望 `apply` 会重跑。
+3. **`plugins.bundle.config` 的 key**：行 id 与包名各注册一份，`configForms` 的命名空间
+   按 schema 字段名匹配（schema 可能是 `{uid, refs}` 信封，需要文本回退）。
+
 ## 与上游的差异
 
 DSH 没有 Pi 的 `context` 投影层（`agent/request` 不能改消息），因此 ObservationPack 在结果

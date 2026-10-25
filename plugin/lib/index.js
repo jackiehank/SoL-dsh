@@ -153,13 +153,25 @@ export function apply(ctx, rawConfig) {
   }
 
   const mount = (key, attach) => {
+    // 注意：apply 用块体、不返回 attach 的结果——Cordis 会把回调返回值当插件实例记录，
+    // 返回普通对象会让 fiber 的状态处理偏离预期（表现为机制没挂上）。
     const handle = ctx.plugin({
       name: `sol-dsh:${key}`,
-      apply: (child) => attach(child),
+      apply: (child) => {
+        attach(child)
+      },
     })
     mounts.set(key, () => {
       Promise.resolve(handle.dispose?.()).catch(() => {})
     })
+  }
+
+  const safeMount = (key, attach) => {
+    try {
+      mount(key, attach)
+    } catch (error) {
+      ctx.logger?.warn?.(`[sol-dsh] mount ${key} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   const sync = () => {
@@ -168,19 +180,19 @@ export function apply(ctx, rawConfig) {
     const active = []
 
     if (config.actionFusion) {
-      mount('actionFusion', (child) => {
+      safeMount('actionFusion', (child) => {
         fusion = attachActionFusion(child, config)
       })
       active.push('actionFusion')
     }
     if (config.observationPack) {
-      mount('observationPack', (child) => attachObservationPack(child, config))
+      safeMount('observationPack', (child) => attachObservationPack(child, config))
       active.push('observationPack')
     }
     // 顺序有意：ObservationPack 在前（它先 next()），Reducer 在后才能看到原始长日志，
     // 并把回执交回给 ObservationPack 判断“是否还需要打包”。
     if (config.evidencePreservingReducer) {
-      mount('evidencePreservingReducer', (child) => {
+      safeMount('evidencePreservingReducer', (child) => {
         const reducer = attachEvidencePreservingReducer(child, config)
         if (reducer !== undefined) {
           diagnosticsInfo.reducer = { provider: reducer.route.provider, model: reducer.route.model }
@@ -189,7 +201,7 @@ export function apply(ctx, rawConfig) {
       active.push('evidencePreservingReducer')
     }
     if (config.onlineContextCompact) {
-      mount('onlineContextCompact', (child) => attachOnlineContextCompact(child, config))
+      safeMount('onlineContextCompact', (child) => attachOnlineContextCompact(child, config))
       active.push('onlineContextCompact')
     }
     if (config.diagnostics && fusion !== undefined && !statusToolRegistered) {

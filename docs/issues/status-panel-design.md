@@ -119,7 +119,7 @@
   “开关拨了但机制没变”。
 - 兼容性：`resolveConfig` 不再手写，未知键/类型错误的文案会变；README 的配置表要同步。
 
-## 落地（0.7.2）
+## 落地（0.7.3）
 
 - **Host**：`Config` 用 schemastery 声明 8 个键，四个机制布尔 + 归约 provider/model + ratio
   标 `.volatile()`；`apply` 把每个机制挂在**子 fiber**（`ctx.plugin`）上，监听
@@ -131,6 +131,9 @@
   同一条 27 KB 输出，开时换成 `obs_…` 句柄，关时原样返回，再开又换成新句柄。
 - **依赖**：`@deepseek-ai/schemastery@3.18.5` + `@deepseek-ai/cosmokit@1.8.6`（lockfile 已提交）；
   这是唯一新增的运行时依赖。
+- **踩坑**：子插件的 `apply` 必须用块体、返回 `undefined`。写成 `apply: (child) => attach(child)`
+  把 attach 的返回值（store 对象）当插件返回值交给 Cordis，机制会挂不上（表现为开关开了
+  但 post-execute 不触发）。改成块体后恢复正常。
 
 ## 结论
 
