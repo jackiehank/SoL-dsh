@@ -97,7 +97,48 @@
 4. `plugin/locale/*.json`：description 补全四个机制；
 5. 版本递增，刷新页面验收。
 
+## collect（第二轮：两个译名的业内用法）
+
+### 查到的中文术语
+
+- **context offloading**：AgentScope 中文文档译作「卸载上下文」，执行组件叫「卸载器（Offloader）」——
+  <https://docs.agentscope.io/zh/versions/2.0.9/building-blocks/context/offload-context>；
+- **output externalization**：有中文教程直接用「工具输出外置」——完整输出写盘，上下文只留指针 + 预览
+  （[learn-workbuddy](https://github.com/adongwanai/learn-workbuddy/blob/af33d6f350e838cc86b64212b633ea366cd2f7ff/s13_output_externalization/README.md)）；
+- **observation masking**：中文论文/解读多译作「观测遮蔽」「观测掩码」；ReAct 里的 Observation 译作「观察」；
+- **上下文压缩（Context Compression）**：术语表强调“压缩的同时保留证据、约束与状态”
+  （<https://qubittool.com/zh/glossary/context-compression>）；
+- **Reducer**：专利 CN103455374B 明确把 Reducer 译作「归约器」，reduce 译作「归约」。
+
+### ObservationPack 候选
+
+| 方案 | 全名 | 短名 | 依据 / 问题 |
+| --- | --- | --- | --- |
+| A | 观测外置（ObservationPack） | 外置 | 对应 output externalization；大结果移出上下文、留句柄；短名不与“压缩”冲突 |
+| B | 观测卸载（ObservationPack） | 卸载 | AgentScope 的“卸载”最贴行业；但中文 UI 里“卸载”容易被读成 uninstall |
+| C | 观测归档（ObservationPack） | 归档 | 语义准确；但“归档 / 归约”同音同形开头，面板相邻两行易混 |
+| D | 观测打包（ObservationPack） | 打包 | 直译 pack；读者看不出“打包”之后发生什么 |
+
+### Evidence-Preserving Reducer 候选
+
+| 方案 | 全名 | 短名 | 依据 / 问题 |
+| --- | --- | --- | --- |
+| A | 留证归约（Evidence-Preserving Reducer） | 归约 | 「留证」= preserve evidence，「归约」= reducer（专利译法）；四字好读 |
+| B | 证据保留归约（Evidence-Preserving Reducer） | 归约 | 直译最完整；六字偏长 |
+| C | 可核验归约（Evidence-Preserving Reducer） | 归约 | 突出“逐字可核验”的约束；弱化了“证据保留” |
+| D | 保真归约（Evidence-Preserving Reducer） | 归约 | “保真”侧重 fidelity，不点明证据 |
+
+### 推荐
+
+- **观测外置（ObservationPack）**，短名「外置」：贴 output externalization 的业内说法，
+  短名与「压缩」区分明显，也避开「归档 / 归约」的撞车；
+- **留证归约（Evidence-Preserving Reducer）**，短名「归约」：四字同时覆盖
+  preserving 与 reducer，专利与 map-reduce 语境都用「归约」。
+
 ## 结论
+
+> 注：本节的「观测收纳 / 证据回执」是第一轮定名；两个译名已被上面的第二轮 collect 取代，
+> 待选定后统一更新。
 
 1. **定名**：动作融合 / 观测收纳 / 证据回执 / 在线上下文压缩；短名固定为
    融合、收纳、回执、压缩（英文 Fusion / Pack / Receipt / Compact）。
