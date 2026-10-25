@@ -360,13 +360,41 @@ window.__ModuleLoader__.load({
      * 原生 bundle 配置页：四个机制开关。
      *
      * DSH 的 Plugins 页只为**注册了 `plugins.bundle.config` 的 bundle** 显示配置区
-     * （plugin-manager 的 ledger 按这个座位的 key 收集）。表单数据来自 Host settings
-     * 的 `sol-dsh` 命名空间，写入走 volatile 字段。
+     * （plugin-manager 的 ledger 按这个座位的 key 收集）。git-panel 的做法是：
+     * 无条件注册座位，组件里用 `ctx.get('configForms')` 找自己的命名空间
+     * （按 schema 字段名匹配，不猜 entry id），再订阅它的快照。
      */
     function BundleConfig(props) {
-      const { configForm, t } = props
-      if (configForm === undefined || typeof t !== 'function') return null
-      const snapshot = React.useSyncExternalStore(configForm.subscribe, configForm.getSnapshot)
+      const { ctx, t } = props
+      const [, bump] = React.useState(0)
+      const configForms = typeof ctx?.get === 'function' ? ctx.get('configForms') : undefined
+      const mirror = configForms?.describe?.()
+
+      React.useEffect(() => {
+        if (mirror === undefined) return undefined
+        const off = mirror.subscribe(() => bump((value) => value + 1))
+        Promise.resolve(mirror.ensure()).catch(() => {})
+        return off
+      }, [mirror])
+
+      const view = mirror?.getSnapshot()?.view
+      const namespaces = Array.isArray(view?.namespaces) ? view.namespaces : []
+      const ns = React.useMemo(() => {
+        const found = namespaces.find((entry) => entry?.schema?.dict !== undefined && 'actionFusion' in entry.schema.dict)
+        return found?.ns
+      }, [view])
+
+      const form = ns !== undefined && configForms !== undefined ? configForms.get(ns) : undefined
+      React.useEffect(() => {
+        if (form === undefined) return undefined
+        const off = form.subscribe(() => bump((value) => value + 1))
+        return off
+      }, [form])
+
+      if (typeof t !== 'function') return null
+      if (form === undefined) return h('div', { className: 'sol-dsh-config-note' }, t('configUnavailable'))
+
+      const snapshot = form.getSnapshot()
       const ready = snapshot.status === 'ready'
       const value = ready ? snapshot.value ?? {} : {}
       const note = ready
@@ -394,7 +422,7 @@ window.__ModuleLoader__.load({
               checked: Boolean(value[field]),
               disabled: !ready || snapshot.writable === false,
               onChange: (event) => {
-                configForm.set(field, event.target.checked)
+                form.set(field, event.target.checked)
               },
             }),
             h('span', { className: 'sol-dsh-switch-track', 'aria-hidden': 'true' }),
@@ -523,26 +551,34 @@ window.__ModuleLoader__.load({
           ),
         )
 
-        // 原生 bundle 配置页：DSH 只为注册了 `plugins.bundle.config` 的 bundle 显示配置区，
-        // 表单数据来自 Host settings 的 `sol-dsh` 命名空间（volatile 字段）。
-        ctx.inject(['configForms'], (configCtx) => {
-          const form = configCtx.configForms.get('sol-dsh')
-          configCtx.effect(
-            () =>
-              configCtx.slots.inject('plugins.bundle.config', () =>
-                configCtx.slots.register(
+        // 原生 bundle 配置页：DSH 只为注册了 `plugins.bundle.config` 的 bundle 显示配置区。
+        // 无条件注册（不依赖 configForms 就绪），两个 key 都登记：行 id 与包名——
+        // git-panel 也是这么覆盖不同入口的 key 解析。
+        ctx.effect(
+          () =>
+            ctx.slots.inject('plugins.bundle.config', () => {
+              const disposers = ['sol-dsh', '@local/sol-dsh'].map((key) =>
+                ctx.slots.register(
                   {
                     name: 'plugins.bundle.config',
-                    key: '@local/sol-dsh',
+                    key,
                     locale: NS,
-                    inject: () => ({ configForm: form }),
                   },
-                  BundleConfig,
+                  (props) => h(BundleConfig, { ...props, ctx }),
                 ),
-              ),
-            'sol-dsh: bundle config page',
-          )
-        })
+              )
+              return () => {
+                for (const dispose of disposers.reverse()) {
+                  try {
+                    dispose()
+                  } catch {
+                    // 卸载时忽略单条失败
+                  }
+                }
+              }
+            }),
+          'sol-dsh: bundle config page',
+        )
       },
     }
   },
