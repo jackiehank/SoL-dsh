@@ -60,14 +60,42 @@ window.__ModuleLoader__.load({
       return `⚡ 融合 ${counts.fusion} · 收纳 ${counts.pack} · 回执 ${counts.receipt} · 压缩 ${counts.compact}`
     }
 
+    /** 调试开关：`localStorage['sol-dsh:debug'] = '1'` 时零命中轮次也渲染一行，用来确认插件是否加载。 */
+    function debugEnabled() {
+      try {
+        return window.localStorage.getItem('sol-dsh:debug') === '1'
+      } catch {
+        return false
+      }
+    }
+
     function TailRow(props) {
-      const { turn, useChat, t } = props
-      // 两个稳定选择器：快照变了才重渲染，避免每次取新数组。
-      const locations = useChat((snapshot) => snapshot.locations)
-      const nodes = useChat((snapshot) => snapshot.nodes)
-      const counts = countsOf(locations.getTurn(turn.turn), nodes)
-      if (counts.fusion + counts.pack + counts.receipt + counts.compact === 0) return null
-      const label = typeof t === 'function' ? t('tail', counts) : formatFallback(counts)
+      const { turn, useChat, t, matched } = props
+      const owner = matched ?? props
+      const turnNo = typeof turn?.turn === 'number' ? turn.turn : owner?.turn?.turn
+      const debug = debugEnabled()
+      let counts = { fusion: 0, pack: 0, receipt: 0, compact: 0 }
+      let counted = false
+      // chain 座位把 select 的返回值作为 `matched` 传入；标准 props 里带 useChat。
+      if (typeof useChat === 'function' && typeof turnNo === 'number') {
+        try {
+          const locations = useChat((snapshot) => snapshot.locations)
+          const nodes = useChat((snapshot) => snapshot.nodes)
+          counts = countsOf(locations.getTurn(turnNo), nodes)
+          counted = true
+        } catch {
+          counted = false
+        }
+      }
+      const total = counts.fusion + counts.pack + counts.receipt + counts.compact
+      if (total === 0 && !debug) return null
+
+      let label
+      if (total === 0) {
+        label = counted ? '⚡ sol-dsh 已加载（本轮无机制命中）' : '⚡ sol-dsh 已加载（读不到会话快照）'
+      } else {
+        label = typeof t === 'function' ? t('tail', counts) : formatFallback(counts)
+      }
       return h(
         'div',
         {
@@ -95,10 +123,11 @@ window.__ModuleLoader__.load({
           en: { tail: '⚡ this turn: fused {fusion} · packed {pack} · receipts {receipt} · compacted {compact}' },
         }), 'sol-dsh: turn-tail dictionary')
 
+        // 这个座位在运行时按 chain 渲染（ui-chat 的 TurnTailNodeView 用 renderSlotChain 调它），
+        // 注册键是 `select` 而不是 list 的 `id`：select 拿到 owner 即接受，是否显示由组件自己决定。
         ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
           name: 'conversation.chat.turnTail',
-          id: 'sol-dsh',
-          order: 5,
+          select: (owner) => owner,
           locale: NS,
         }, TailRow))
       },
