@@ -1,7 +1,7 @@
 # @local/sol-dsh
 
-SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 bundle，
-零外部依赖，四个机制默认全关。**配置键与上游 `sol-pi.json` 一致**，只有 8 个。
+SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + 一个 Web GUI 的
+每轮状态行（Client 半），零外部依赖，四个机制默认全关。**配置键与上游 `sol-pi.json` 一致**，只有 8 个。
 
 ## 开关（`cordis.patch.yml` 的 `config`）
 
@@ -50,6 +50,41 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
   turn 的下一 step 自然继续，不注入“继续工作”的消息。
 - **失败开放**：归档写失败、模型不可用/超时/输出不合法、监听器异常都保留原结果，只打
   `[sol-dsh]` 警告，并在 `evidence-preserving-reducer/ledger.jsonl` 记下原因（账本常开、KB 级）。
+
+## 每轮一行：turnTail（Client 半）
+
+`plugin/client.js` 注册 `conversation.chat.turnTail`，在每轮结束、动作行（复制 / 点赞 / 用量 / 时间）之前
+渲染一行：
+
+```
+⚡ 本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0
+```
+
+- 计数全部来自会话里本来就有的字面量：`[then_run:succeeded]`、占位符首行
+  `[large tool result replaced before it entered the context]`、`sol_pi_evidence_receipt_v1`、
+  `kind === 'compaction'` 的节点——不花模型 token，也不新增 Host→Client 通道；
+- **四计数全零时整条不渲染**，所以四个机制全关时界面没有任何变化；
+- 排障开关：DevTools 里 `localStorage['sol-dsh:debug'] = '1'` 后刷新，零命中轮次也会显示
+  `⚡ sol-dsh 已加载（本轮无机制命中）`（或 `读不到会话快照`），并在控制台打印
+  `[sol-dsh] turn N keys M kinds …`；关掉用 `localStorage.removeItem('sol-dsh:debug')`。
+
+与上游的对应关系：上游 Pi 的 `tui.ts` 用 `ctx.ui.setStatus` + `ctx.ui.notify` 做 4 秒瞬时提示，
+DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡片标题也不可插（`presentCall`/`presentResult`
+在本 build 没有消费者），所以这里换成“每轮一行、可回看”的形态。
+
+## 客户端踩坑（真机记录）
+
+写 Client 半时踩过的三处形状误判，都是“拿宿主侧的字段名去读客户端快照”：
+
+1. **座位注册要 `id`**：`list slot "conversation.chat.turnTail" requires options.id`。
+   `renderSlotChain` 只是**取用**方式，注册契约仍是 list 的 `id`；只给 `select` 会直接抛错。
+2. **内容块用 `kind`**：客户端会话块是 `block.kind === 'text'`（ui-chat 自己的渲染器就这么写），
+   不是宿主侧的 `block.type`。按 `type` 判断会永远拼出空串。
+3. **工具结果在 `data.root`**：Chat 快照里没有 `tool-result` 节点，工具调用是 `kind: 'tool-call'`
+   的节点，结果挂在 `data.root` 上（落定后才是 `kind: 'tool-result'` 的块），嵌套调用在 `subCalls`。
+   压缩节点是 `compaction`／`manual-compaction`。
+
+Client 半改动要**页面刷新**才生效（Host 侧重载带不上浏览器模块）。
 
 ## 与上游的差异
 
