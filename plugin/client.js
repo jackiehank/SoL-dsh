@@ -356,6 +356,54 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 原生 bundle 配置页：四个机制开关。
+     *
+     * DSH 的 Plugins 页只为**注册了 `plugins.bundle.config` 的 bundle** 显示配置区
+     * （plugin-manager 的 ledger 按这个座位的 key 收集）。表单数据来自 Host settings
+     * 的 `sol-dsh` 命名空间，写入走 volatile 字段。
+     */
+    function BundleConfig(props) {
+      const { configForm, t } = props
+      if (configForm === undefined || typeof t !== 'function') return null
+      const snapshot = React.useSyncExternalStore(configForm.subscribe, configForm.getSnapshot)
+      const ready = snapshot.status === 'ready'
+      const value = ready ? snapshot.value ?? {} : {}
+      const note = ready
+        ? t('configHint')
+        : snapshot.status === 'unavailable'
+          ? t('configUnavailable')
+          : t('configLoading')
+      const rows = [
+        ['actionFusion', t('toggleFusion')],
+        ['observationPack', t('togglePack')],
+        ['evidencePreservingReducer', t('toggleReducer')],
+        ['onlineContextCompact', t('toggleCompact')],
+      ]
+      return h(
+        'div',
+        { className: 'sol-dsh-config' },
+        h('div', { className: 'sol-dsh-config-title' }, t('configTitle')),
+        h('div', { className: 'sol-dsh-config-note' }, note),
+        rows.map(([field, label]) =>
+          h(
+            'label',
+            { className: 'sol-dsh-switch', key: field },
+            h('input', {
+              type: 'checkbox',
+              checked: Boolean(value[field]),
+              disabled: !ready || snapshot.writable === false,
+              onChange: (event) => {
+                configForm.set(field, event.target.checked)
+              },
+            }),
+            h('span', { className: 'sol-dsh-switch-track', 'aria-hidden': 'true' }),
+            h('span', { className: 'sol-dsh-switch-label' }, label),
+          ),
+        ),
+      )
+    }
+
     const CSS = `
 .sol-dsh-dock { position: relative; display: inline-flex; align-items: center; }
 .sol-dsh-pill { box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin: 0; padding: 1px 8px; border: 0; border-radius: var(--dsw-radius-sm); background: none; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; }
@@ -372,6 +420,17 @@ window.__ModuleLoader__.load({
 .sol-dsh-grid dt, .sol-dsh-grid dd { margin: 0; min-width: 0; }
 .sol-dsh-grid dd { color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; text-align: right; }
 .sol-dsh-foot { margin-top: 10px; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 16px; }
+.sol-dsh-config { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.sol-dsh-config-title { margin: 0; color: var(--dsw-alias-label-primary); font-size: 15px; font-weight: 600; line-height: 22px; }
+.sol-dsh-config-note { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+.sol-dsh-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+.sol-dsh-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.sol-dsh-switch-track { position: relative; flex: none; width: 32px; height: 18px; border-radius: 9px; background: var(--dsw-alias-border-l2); transition: background .15s; }
+.sol-dsh-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sol-dsh-switch input:checked + .sol-dsh-switch-track { background: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary)); }
+.sol-dsh-switch input:checked + .sol-dsh-switch-track::after { transform: translateX(14px); }
+.sol-dsh-switch input:disabled + .sol-dsh-switch-track { opacity: .5; }
+.sol-dsh-switch:has(input:focus-visible) .sol-dsh-switch-track { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
 `
 
     return {
@@ -384,6 +443,14 @@ window.__ModuleLoader__.load({
                 tail: '本轮：融合 {fusion} · 收纳 {pack} · 回执 {receipt} · 压缩 {compact}',
                 pill: '已省 {tokens} tok · {percent}%',
                 pillAria: 'sol-dsh 本会话节省明细',
+                configTitle: '机制开关',
+                configHint: '开关会写入 profile 配置；当前版本需重载插件后机制才生效。',
+                configLoading: '正在读取配置…',
+                configUnavailable: 'Host 没有暴露该配置命名空间，请重载插件或检查 DSH 版本。',
+                toggleFusion: 'Action Fusion · edit/write 的 then_run',
+                togglePack: 'ObservationPack · 大结果句柄',
+                toggleReducer: 'Evidence-Preserving Reducer · 回执',
+                toggleCompact: 'Online Context Compact · 完成点压缩',
                 panelTitle: '本会话',
                 rowPack: '收纳',
                 rowReceipt: '回执',
@@ -398,6 +465,14 @@ window.__ModuleLoader__.load({
                 tail: 'This turn: fused {fusion} · packed {pack} · receipts {receipt} · compacted {compact}',
                 pill: 'Saved {tokens} tok · {percent}%',
                 pillAria: 'sol-dsh session savings details',
+                configTitle: 'Mechanism switches',
+                configHint: 'Switch writes persist to the profile config; this version applies them after the plugin reloads.',
+                configLoading: 'Reading configuration…',
+                configUnavailable: 'The Host does not expose this configuration namespace; reload the plugin or check the DSH version.',
+                toggleFusion: 'Action Fusion · then_run for edit/write',
+                togglePack: 'ObservationPack · large-result handles',
+                toggleReducer: 'Evidence-Preserving Reducer · receipts',
+                toggleCompact: 'Online Context Compact · completion compaction',
                 panelTitle: 'This session',
                 rowPack: 'Packed',
                 rowReceipt: 'Receipts',
@@ -447,6 +522,27 @@ window.__ModuleLoader__.load({
             DockRow,
           ),
         )
+
+        // 原生 bundle 配置页：DSH 只为注册了 `plugins.bundle.config` 的 bundle 显示配置区，
+        // 表单数据来自 Host settings 的 `sol-dsh` 命名空间（volatile 字段）。
+        ctx.inject(['configForms'], (configCtx) => {
+          const form = configCtx.configForms.get('sol-dsh')
+          configCtx.effect(
+            () =>
+              configCtx.slots.inject('plugins.bundle.config', () =>
+                configCtx.slots.register(
+                  {
+                    name: 'plugins.bundle.config',
+                    key: '@local/sol-dsh',
+                    locale: NS,
+                    inject: () => ({ configForm: form }),
+                  },
+                  BundleConfig,
+                ),
+              ),
+            'sol-dsh: bundle config page',
+          )
+        })
       },
     }
   },
