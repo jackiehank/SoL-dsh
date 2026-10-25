@@ -1,10 +1,31 @@
 # @local/sol-dsh
 
-SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + 两个 Web GUI
-状态面（Client 半：每轮尾行 + 输入框下方可点开的节省面板），四个机制默认全关。
+SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + Client 半
+（每轮尾行、输入框下方面板、设置页开关），四个机制默认全关。
 **配置键与上游 `sol-pi.json` 一致**，只有 8 个。
 
-## 开关（`cordis.patch.yml` 的 `config`）
+## 安装
+
+1. 需要 **DSH 0.2.1-rc.3**（桌面版实测）；更老版本没有 `sessionProjections` 时，
+   历史统计会退回扫当前快照。
+2. 本包依赖 `@deepseek-ai/schemastery`（Host 侧 `Config` schema 需要它），
+   首次安装前先在插件目录装依赖：
+
+   ```powershell
+   cd plugin
+   pnpm install
+   ```
+
+3. 用 DSH 的 `plugin_manager` 安装本目录（`install_bundle`，target 指向 `plugin/`）。
+4. 装完默认全关；在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制。
+
+## 开关
+
+**推荐路径：Web GUI 的 Plugins → SoL-dsh → 机制开关。** 四个开关是 Host `Config` 的
+volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对应机制挂载/卸载
+（不重载整个插件），并写回 profile 的 `cordis.patch.yml`。
+
+也可以直接改 profile 的 `cordis.patch.yml`（等价，重载后生效）：
 
 | 键 | 默认 | 作用 |
 | --- | --- | --- |
@@ -16,10 +37,6 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 | `evidencePreservingReducerModel` | 空 | 归约模型 id；留空 = 默认路由 |
 | `onlineContextCompact` | `false` | 计划步骤完成点触发原生压缩（同一 turn 继续） |
 | `cacheWriteReadRatio` | `12.5` | 与上游同名；当前实现保留并校验，暂未参与决策 |
-
-也可以直接在 Web GUI 的 **Plugins → SoL-dsh → 机制开关** 里切：四个开关是 Host `Config` 的
-volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对应机制挂载/卸载（不重载整个插件），
-并写回 profile 的 `cordis.patch.yml`。
 
 未知键、类型错误、非法取值在插件装配阶段直接报错。**阈值不开放**：10 KiB 打包阈值、16 KiB/400 行召回、
 4096 B/600k 字符/90s/2048 token 归约参数、compact 的保留尾部与冷却系数，都取与上游一致的内部默认。
@@ -145,15 +162,9 @@ resume 后冷却从头开始。
 
 上游把账本写进 session 事件；DSH 不允许插件新增事件类型，所以落到 `<storageRoot>/**/ledger.jsonl`。
 
-## 依赖
-
-`plugin/` 依赖 `@deepseek-ai/schemastery`（Host 侧 `Config` schema 需要它）。首次使用先在插件目录
-执行一次 `pnpm install`（lockfile 已提交），否则 Host 启动时解析不到该模块。
-
 ## 启用与回退
 
-1. 在 Web GUI 的 **Plugins → SoL-dsh → 机制开关** 里切换，或改 `cordis.patch.yml` 里对应的布尔值；
-2. 走 GUI 时即时生效；改 yml 后让 profile 重新加载插件（`plugin_manager` 重新安装，或重启 Harness）；
-3. 回退 = 关掉开关并再次加载；拔插件后归档目录留在 `storageRoot`，可自行清理。
+1. 在 **Plugins → SoL-dsh → 机制开关** 里切换即时生效；改 `cordis.patch.yml` 需要重载插件；
+2. 回退 = 关掉开关；卸载插件后归档目录留在 `storageRoot`，可自行清理。
 
 归档是本地明文，可能含日志里的敏感内容；`DSH_SOL_DSH_HOME` 不要指向共享目录。
