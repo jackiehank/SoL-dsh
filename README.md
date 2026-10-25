@@ -24,18 +24,23 @@
 
 ## 安装
 
-1. 需要 **DSH 0.2.1-rc.3**（桌面版实测；更老版本没有 `sessionProjections`，
-   历史统计会退回扫当前快照）。
-2. `plugin/` 依赖 `@deepseek-ai/schemastery`（Host 侧 `Config` schema 用），首次安装前先在插件目录装依赖：
+像其他开源 DSH 插件一样，直接从 GitHub 仓库安装（依赖由 pnpm 自动装好）：
 
-   ```powershell
-   cd plugin
-   pnpm install
-   ```
+```powershell
+dsh plugin --profile desktop add github:jackiehank/SoL-dsh
+```
 
-3. 用 DSH 的 `plugin_manager` 安装本目录下的 `plugin/`（`install_bundle`，target 指向 `plugin/` 目录）。
-   装完默认不改变任何行为。
-4. 在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制。
+也可以在 DSH 的 **Plugins → 安装** 对话框里填同一个 spec：
+
+```text
+github:jackiehank/SoL-dsh
+```
+
+装完默认全关；在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制。
+
+- 需要 **DSH 0.2.1-rc.3**（桌面版实测；更老版本没有 `sessionProjections`，
+  历史统计会退回扫当前快照）；
+- 本地开发：在仓库根 `pnpm install`，再用 `plugin_manager` 的 `install_bundle` 指向仓库根。
 
 ## 配置
 
@@ -84,7 +89,7 @@ DSH 特有的两件事走环境变量：
 - **在线上下文压缩**：观察 `todo_write`，在“旧步骤变 completed”的边界用 `ctx.tokenMeter`
   选区间，经济性成立才调 `ctx.compaction.compactRegion`，不注入“继续工作”的消息。
 
-细节与取舍见 [`plugin/README.md`](plugin/README.md) 和 [`docs/issues/`](docs/issues/)。
+细节与取舍见 [`docs/plugin.md`](docs/plugin.md) 和 [`docs/issues/`](docs/issues/)。
 
 ## 兼容性与边界
 
@@ -97,22 +102,23 @@ DSH 特有的两件事走环境变量：
 ## 开发
 
 ```powershell
-cd plugin
-pnpm install
-cd ..
-node --test tests          # 纯函数 + 机制级测试
-node --check plugin/client.js
+pnpm install              # 在仓库根装依赖（schemastery/cosmokit）
+node --test tests         # 纯函数 + 机制级测试
+node --check client.js
 ```
 
 目录：
 
 ```text
-plugin/                 @local/sol-dsh bundle（Host 半 + Client 半）
-  lib/                  四个机制 + 配置 + 会话节省投影
-  client.js             设置页开关、每轮尾行、输入框下方面板
-  locale/               包元数据（中/英）
-tests/                  node --test
-docs/issues/            kiln issue 文档（设计与真机记录）
+package.json             DSH bundle 清单（exports / dsh.bundle.patch / dsh.client）
+lib/                     Host 半：四个机制、配置、会话节省投影
+client.js                Client 半：设置页开关、每轮尾行、节省面板
+cordis.patch.yml         插入插件行 + 默认配置（四个机制全关）
+locale/                  包元数据（中/英）
+icon.svg
+tests/                   node --test
+docs/issues/             kiln issue 文档（设计与真机记录）
+LICENSE                  MIT
 ```
 
 ## 文档与 issue

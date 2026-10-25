@@ -1,8 +1,0 @@
-- id: sol-dsh
-  config:
-    version: 1
-    actionFusion: false
-    observationPack: false
-    evidencePreservingReducer: true
-    onlineContextCompact: false
-    cacheWriteReadRatio: 12.5

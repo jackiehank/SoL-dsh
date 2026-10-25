@@ -1,10 +1,25 @@
 {
   "name": "@local/sol-dsh",
-  "version": "0.7.4",
-  "private": true,
+  "version": "0.8.0",
   "type": "module",
-  "description": "SoL-Pi 四个效率机制在 DSH 上的移植（默认全关）",
+  "description": "SoL-Pi 四种效率机制在 DSH 上的移植（默认全关）",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jackiehank/SoL-dsh.git"
+  },
+  "homepage": "https://github.com/jackiehank/SoL-dsh",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "agent",
+    "context-engineering",
+    "sol-pi"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./client.js",
@@ -16,7 +31,9 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {

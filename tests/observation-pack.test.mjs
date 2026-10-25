@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createStore, countLines, sha256 } from '../plugin/lib/store.js'
+import { createStore, countLines, sha256 } from '../lib/store.js'
 import {
   completeLineExcerpt,
   createObservation,
@@ -11,7 +11,7 @@ import {
   createRecallDefinition,
   placeholderFor,
   textOfContent,
-} from '../plugin/lib/observation-pack.js'
+} from '../lib/observation-pack.js'
 
 const exec = Object.freeze({
   name: 'pwsh',

@@ -1,8 +1,0 @@
-{
-  "name": "@local/sol-dsh-reducer-lab",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "description": "实验开关：只开 Evidence-Preserving Reducer，high + temperature 0",
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
-}

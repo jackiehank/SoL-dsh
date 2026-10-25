@@ -62,7 +62,7 @@ kiln commit <issue> ask --title "<问题一句话>" --domain <domain> `
 kiln commit <issue> collect --title "<收到了什么、关键数字>" --domain <domain> --refs "docs/issues/<issue>.md, probe.log"
 
 # 收尾：apply = 已落地；只有结论用 conclude
-kiln commit <issue> apply --title "<落地了什么、怎么验证>" --target plugin/lib/foo.js
+kiln commit <issue> apply --title "<落地了什么、怎么验证>" --target lib/foo.js
 ```
 
 `kiln commit` 默认提交**整个工作区**（快照）。提交前 `git status --short`，只提交一部分用 `--only <paths>`。
@@ -70,28 +70,35 @@ kiln commit <issue> apply --title "<落地了什么、怎么验证>" --target pl
 ## 5. 项目结构
 
 ```text
-plugin/                    @local/sol-dsh：DSH bundle（Host 半）
-  package.json             dsh.bundle.patch 指向 cordis.patch.yml
-  cordis.patch.yml         插入插件行 + 默认配置（四个机制全关）
-  lib/index.js             apply(ctx, config)：装配四个机制
-  lib/config.js            配置读取与校验（未知键、类型错误直接报错）
-  lib/action-fusion.js     遮蔽 edit/write，加 then_run
-  lib/observation-pack.js  post-execute 替换大结果 + obs_recall
-  lib/store.js             归档与精确分页
-  locale/{en,zh}.json      展示元数据
-  icon.svg
+package.json               DSH bundle 清单（exports / dsh.bundle.patch / dsh.client）
+cordis.patch.yml           插入插件行 + 默认配置（四个机制全关）
+lib/index.js               apply(ctx, config)：装配四个机制 + 会话节省投影
+lib/config.js              配置读取与校验（未知键、类型错误直接报错）
+lib/action-fusion.js       遮蔽 edit/write，加 then_run
+lib/observation-pack.js    post-execute 替换大结果 + obs_recall
+lib/reducer.js             诊断日志 → 逐字可核验回执
+lib/compact.js             计划完成点触发 compaction
+lib/savings.js             solDshStats 会话投影
+lib/store.js               归档与精确分页
+client.js                  设置页开关、每轮尾行、节省面板
+locale/{en,zh}.json        包元数据
+icon.svg
 tests/                     node --test，纯函数 + 机制级测试
 docs/issues/               kiln issue 文档
+LICENSE                    MIT
 ```
 
 ## 6. 开发命令
 
 ```powershell
+pnpm install                 # 仓库根装依赖（schemastery/cosmokit）
 node --test tests            # 单元/机制测试
-node --check plugin/lib/index.js
+node --check lib/index.js
+node --check client.js
 ```
 
-插件安装走 DSH 的 `plugin_manager`（`install_bundle` 指向 `plugin/` 目录），不要手工改 profile。
+安装插件用 DSH 的 `plugin_manager`（`install_bundle` 指向仓库根），或直接
+`dsh plugin --profile desktop add github:jackiehank/SoL-dsh`；不要手工改 profile。
 
 ## 7. 实测踩坑
 
@@ -110,7 +117,7 @@ issue: action-fusion-dsh
 action: apply
 title: 让 DSH 的 edit/write 在同一调用里跑 then_run（scoped 遮蔽 + pwsh 管线）
 domain: tooling
-target: plugin/lib/action-fusion.js
+target: lib/action-fusion.js
 refs: docs/issues/action-fusion-dsh.md
 scope: DSH tool pipeline
 tags: tools, fusion

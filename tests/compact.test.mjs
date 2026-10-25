@@ -8,8 +8,8 @@ import {
   createPlanTracker,
   decideCompaction,
   selectRange,
-} from '../plugin/lib/compact.js'
-import { resolveConfig } from '../plugin/lib/config.js'
+} from '../lib/compact.js'
+import { resolveConfig } from '../lib/config.js'
 
 test('计划跟踪：只有“旧步骤变成 completed”才算边界，新引入的 completed 只是历史', () => {
   const tracker = createPlanTracker()

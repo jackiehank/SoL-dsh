@@ -6,18 +6,16 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 
 ## 安装
 
-1. 需要 **DSH 0.2.1-rc.3**（桌面版实测）；更老版本没有 `sessionProjections` 时，
-   历史统计会退回扫当前快照。
-2. 本包依赖 `@deepseek-ai/schemastery`（Host 侧 `Config` schema 需要它），
-   首次安装前先在插件目录装依赖：
+像其他开源 DSH 插件一样，直接从 GitHub 仓库安装（依赖由 pnpm 自动装好）：
 
-   ```powershell
-   cd plugin
-   pnpm install
-   ```
+```powershell
+dsh plugin --profile desktop add github:jackiehank/SoL-dsh
+```
 
-3. 用 DSH 的 `plugin_manager` 安装本目录（`install_bundle`，target 指向 `plugin/`）。
-4. 装完默认全关；在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制。
+- 需要 **DSH 0.2.1-rc.3**（桌面版实测）；更老版本没有 `sessionProjections` 时，
+  历史统计会退回扫当前快照；
+- 装完默认全关；在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制；
+- 本地开发：在仓库根 `pnpm install`，再用 `plugin_manager` 的 `install_bundle` 指向仓库根。
 
 ## 开关
 
@@ -75,7 +73,7 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 
 ## 两个状态面（Client 半）
 
-`plugin/client.js` 注册两个座位：尾行是纯客户端读数；输入框下方的累计来自 Host 侧
+`client.js` 注册两个座位：尾行是纯客户端读数；输入框下方的累计来自 Host 侧
 `solDshStats` 投影（按整条会话日志折叠，客户端快照只作老版本回退）。
 
 ### 尾行：`conversation.chat.turnTail`
@@ -107,7 +105,7 @@ volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对�
 ```
 
 - 0 项也显示（不隐藏零行）；点外部 / Esc / 再次点击关闭；
-- 数字来自 `plugin/lib/savings.js` 注册的 `solDshStats` 投影（`ctx.sessionProjections`）：
+- 数字来自 `lib/savings.js` 注册的 `solDshStats` 投影（`ctx.sessionProjections`）：
   它按 `session/event` 折整条会话日志，**不受快照分页、重启、机制开关影响**；
   投影不可用时退化为扫描已加载快照。
   - 寄存 = 占位符 `estimated_tokens` - 占位符自身；

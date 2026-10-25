@@ -10,7 +10,7 @@ import {
   THEN_RUN_SKIPPED,
   THEN_RUN_SUCCEEDED,
   withThenRun,
-} from '../plugin/lib/action-fusion.js'
+} from '../lib/action-fusion.js'
 import { createAgentScope, createRootContext } from './helpers.mjs'
 
 function makeExec(overrides = {}) {

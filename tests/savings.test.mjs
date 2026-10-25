@@ -9,7 +9,7 @@ import {
   packSavings,
   receiptSavings,
   tokenCount,
-} from '../plugin/lib/savings.js'
+} from '../lib/savings.js'
 
 function packText() {
   return [

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
-import { INTERNAL_DEFAULTS, PUBLIC_KEYS, resolveConfig } from '../plugin/lib/config.js'
+import { INTERNAL_DEFAULTS, PUBLIC_KEYS, resolveConfig } from '../lib/config.js'
 
 function withEnv(changes, run) {
   const saved = {}

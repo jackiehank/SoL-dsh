@@ -31,3 +31,19 @@
    （本地用 `install_bundle` 指向仓库根验证）；
 4. 现有 profile 配置（动作融合/长输出寄存已开）在重装后保持；
 5. 测试全绿，README 安装章节同步。
+
+## 落地
+
+- 删除 `enable-bundle/`、`enable-reducer/`、`enable-reducer-flash/`；
+- 新增 MIT `LICENSE`（Copyright (c) 2026 Jackie Hank）；
+- 包清单上移到仓库根：`lib/`、`client.js`、`cordis.patch.yml`、`locale/`、`icon.svg` 随之上移，
+  `tests/` 的导入改成 `../lib/...`；
+- 包名仍是 `@local/sol-dsh`，profile 里的配置行不用改；依赖上移到根，
+  `pnpm-lock.yaml` 在根生成；
+- **发现 DSH 的 bundle 入口约定**：Loader 从解析到的入口反推包目录
+  （`<pkg>/lib/index.js` → `<pkg>`）。把包留在 `plugin/` 而入口写成 `plugin/lib/index.js` 时，
+  反推出的包目录是 `plugin/`，再拼 `cordis.patch.yml` 就变成 `plugin/plugin/...`（ENOENT）。
+  所以包必须放在仓库根、`lib/` 也在根；
+- 本地验证：新进程 `require.resolve('@local/sol-dsh')` 指向根的 `lib/index.js`；
+  旧 DSH 进程缓存了旧入口路径，重装后报 ENOENT，**需重启 DSH** 才能加载新布局；
+- GitHub 直装：`dsh plugin --profile desktop add github:jackiehank/SoL-dsh`（依赖自动安装）。

@@ -14,8 +14,8 @@ import {
   sha256,
   stripCodeFence,
   validateReceipt,
-} from '../plugin/lib/reducer.js'
-import { resolveConfig } from '../plugin/lib/config.js'
+} from '../lib/reducer.js'
+import { resolveConfig } from '../lib/config.js'
 
 const BODY = [
   'go test ./...',
