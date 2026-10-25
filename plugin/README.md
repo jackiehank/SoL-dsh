@@ -54,7 +54,8 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 
 ## 两个状态面（Client 半）
 
-`plugin/client.js` 注册两个座位，都不改 Host 半、不新增 Host→Client 通道。
+`plugin/client.js` 注册两个座位：尾行是纯客户端读数；输入框下方的累计来自 Host 侧
+`solDshStats` 投影（按整条会话日志折叠，客户端快照只作老版本回退）。
 
 ### 尾行：`conversation.chat.turnTail`
 
@@ -85,14 +86,17 @@ SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植�
 ```
 
 - 0 项也显示（不隐藏零行）；点外部 / Esc / 再次点击关闭；
-- 数字全部从会话快照算：
+- 数字来自 `plugin/lib/savings.js` 注册的 `solDshStats` 投影（`ctx.sessionProjections`）：
+  它按 `session/event` 折整条会话日志，**不受快照分页、重启、机制开关影响**；
+  投影不可用时退化为扫描已加载快照。
   - 收纳 = 占位符 `estimated_tokens` - 占位符自身；
   - 回执 = 回执头 `source_bytes` - 回执自身；
-  - 压缩 = compaction 节点的 `shadowedTokenCount`（`manual-compaction` 取 `data.compaction`）；
+  - 压缩 = `compaction/summary` 的 `shadowedTokenCount`；
   - 融合 = `[then_run:succeeded]` 次数，不折算 token；
   - 百分比 = (收纳 + 回执) / (收纳 + 回执 + 工具结果实际写入 token)。
-- 口径是 4 字符 ≈ 1 token 的估算，只计首次写入、不含后续缓存读取；
-- 扫描范围是本会话**已加载**的轮次（快照分页时不含未加载页）。
+- 口径是 4 字符 ≈ 1 token 的估算，只计首次写入、不含后续缓存读取。
+- 投影 key 与客户端常量保持一致（`solDshStats`）；老版本 DSH 没有
+  `sessionProjections` 时静默跳过注册。
 
 与上游的对应关系：上游 Pi 的 `tui.ts` 用 `ctx.ui.setStatus` + `ctx.ui.notify` 做 4 秒瞬时提示，
 DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡片标题也不可插（`presentCall`/`presentResult`
@@ -100,7 +104,7 @@ DSH 没有服务端 toast（`workspace.toast` 的 key 是固定枚举），卡�
 
 ## 客户端踩坑（真机记录）
 
-写 Client 半时踩过的三处形状误判，都是“拿宿主侧的字段名去读客户端快照”：
+写 Client 半时踩过的几处形状误判，都是“拿宿主侧的字段名去读客户端快照”：
 
 1. **座位注册要 `id`**：`list slot "conversation.chat.turnTail" requires options.id`。
    `renderSlotChain` 只是**取用**方式，注册契约仍是 list 的 `id`；只给 `select` 会直接抛错。

@@ -10,6 +10,7 @@ import { attachActionFusion } from './action-fusion.js'
 import { attachObservationPack } from './observation-pack.js'
 import { attachEvidencePreservingReducer } from './reducer.js'
 import { attachOnlineContextCompact } from './compact.js'
+import { createStatsProjectionDefinition } from './savings.js'
 
 /** Cordis 函数插件名；与包名一致，便于在日志和插件列表里对号入座。 */
 export const name = 'sol-dsh'
@@ -88,6 +89,15 @@ export function apply(ctx, rawConfig) {
   const diagnosticsInfo = {}
   let fusion
 
+  // 会话级节省统计与开关无关：即使四个机制全关，历史累计也要能显示。
+  // 用 inject 等 sessionProjections 就绪；没有这个服务的 profile 里静默跳过。
+  ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.effect(
+      () => projectionCtx.sessionProjections.register(createStatsProjectionDefinition()),
+      'sol-dsh: session savings projection',
+    )
+  })
+
   if (config.actionFusion) {
     fusion = attachActionFusion(ctx, config)
     active.push('actionFusion')
@@ -114,7 +124,7 @@ export function apply(ctx, rawConfig) {
   }
 
   if (active.length === 0) {
-    ctx.logger?.info?.('[sol-dsh] 四个机制均未开启（opt-in），不注册任何扩展')
+    ctx.logger?.info?.('[sol-dsh] 四个机制均未开启（opt-in），只保留会话节省投影')
     return
   }
   ctx.logger?.info?.(`[sol-dsh] 已开启：${active.map((key) => MECHANISMS[key]).join('；')}`)

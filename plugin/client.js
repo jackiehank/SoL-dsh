@@ -25,6 +25,8 @@ window.__ModuleLoader__.load({
     const PACK_MARK = '[large tool result replaced before it entered the context]'
     const RECEIPT_MARK = 'sol_pi_evidence_receipt_v1'
     const CHARS_PER_TOKEN = 4
+    /** Host 侧 `solDshStats` 投影的 key；与 `plugin/lib/savings.js` 保持一致。 */
+    const PROJECTION_KEY = 'solDshStats'
 
     /**
      * 结果节点的文本拼接（只读）。
@@ -264,22 +266,24 @@ window.__ModuleLoader__.load({
     /**
      * 输入框下方常驻的一行：本会话累计节省，点击展开明细。
      *
-     * 所在座位与 DSH 自己的「Token 用量」同一处（`conversation.composer.dock`），
-     * standard props 里同样有 `useChat`，所以能直接读整份会话快照。
+     * 数据优先取 Host 的 `solDshStats` 投影——它按整条会话日志折叠，分页、重启、
+     * 机制开关都不影响历史累计；投影不可用（老版本）时退回扫描已加载快照。
      */
     function DockRow(props) {
-      const { useChat, t } = props
+      const { useChat, useProjection, t } = props
       const timeline = useChat((snapshot) => snapshot.timeline)
       const locations = useChat((snapshot) => snapshot.locations)
       const nodes = useChat((snapshot) => snapshot.nodes)
+      const projected = typeof useProjection === 'function' ? useProjection(PROJECTION_KEY) : undefined
 
       const summary = React.useMemo(() => {
+        if (projected !== undefined && projected !== null) return projected
         try {
           return summarizeSession({ timeline, locations, nodes })
         } catch {
           return emptySummary()
         }
-      }, [timeline, locations, nodes])
+      }, [projected, timeline, locations, nodes])
 
       const [open, setOpen] = React.useState(false)
       const rootRef = React.useRef(null)
