@@ -380,7 +380,16 @@ window.__ModuleLoader__.load({
       const view = mirror?.getSnapshot()?.view
       const namespaces = Array.isArray(view?.namespaces) ? view.namespaces : []
       const ns = React.useMemo(() => {
-        const found = namespaces.find((entry) => entry?.schema?.dict !== undefined && 'actionFusion' in entry.schema.dict)
+        const found = namespaces.find((entry) => {
+          const dict = entry?.schema?.dict
+          if (dict !== undefined && 'actionFusion' in dict) return true
+          // schema 可能是 schemastery 的 {uid, refs} 信封；字段名不在 dict 时退回文本匹配。
+          try {
+            return JSON.stringify(entry?.schema).includes('actionFusion')
+          } catch {
+            return false
+          }
+        })
         return found?.ns
       }, [view])
 
