@@ -32,6 +32,44 @@
   客户端读不到。
 - 客户端 `host.call(...)` 是否存在、静态 bundle 能否用，**尚未验证**。
 
+## 调研结论（2026-10-25）
+
+### DSH 自己怎么显示（可照抄的交互语言）
+
+「Token 用量」就是 `conversation.composer.dock` 里的一个条目：`id: "usage"`、`order: 1`，
+组件 `UsagePill({ useProjection, usePerformanceUsage, t })`。点击后走 `DialogPill`：
+
+- 触发：`<button aria-haspopup="dialog" aria-expanded>`，`pill` 样式 12px、
+  `--dsw-alias-label-tertiary`，hover 背景 `--dsw-alias-interactive-bg-hover` 且字变 secondary；
+  图标 14px 线性，`currentColor`；
+- 面板：portal 到 `document.body`，`role="dialog"`，`position: fixed`，
+  按触发按钮 `side: "top", gap: 8` 定位并做视口 clamp，`z-index: 1100`；
+  背景 `--dsw-specific-menu`、`radius-lg`、`padding 16px`、标题 primary/500、
+  0.5px 分隔线 `--dsw-alias-label-*`、明细两列 grid（`minmax(76px,auto)`，右对齐、tabular-nums）；
+- 关闭：外部 pointerdown/click、Esc、再次点击触发按钮。
+
+所以“可点击 + 浮层”不需要新交互，照着 dock 里已有的 pill/dialog 做即可。
+
+### 客户端能拿到的数据（都已在本 build 验证）
+
+| 需要 | 来源 | 说明 |
+| --- | --- | --- |
+| 本会话计费 token | `useProjection("tokenUsage")` | `uncachedInputTokens / cacheReadTokens / cacheWriteTokens / outputTokens`；DSH 的 `UsagePill` 在**同一个 dock 座位**里用了它，`ActivityPill` 同座位同时用 `useChat`+`useProjection`，说明 dock 条目的 standard props 两者都有 |
+| 全量 turn 列表 | `useChat((s) => s.timeline.turnOrder)` | 配合 `snapshot.locations.getTurn(turn)`、`snapshot.nodes` 遍历已加载的轮次 |
+| 收纳省了多少 | 占位符文本 | 含 `original_bytes`、`original_lines`、`estimated_tokens`，占位符自身长度也可量 |
+| 回执省了多少 | 回执头 | `receiptText` 里带 `source_bytes=`，回执自身长度可量 |
+| 压缩移出多少 | compaction 节点 `data` | 含 `shadowedTokenCount`、`shadowedItemCount` |
+| 融合省了几次 | `[then_run:succeeded]` | 只有次数，没有 token 数 |
+
+`tokenUsage` 的面板口径（DSH 自己）：`billedInput = uncached + cacheRead + cacheWrite`，
+总量 = `billedInput + outputTokens`。这条可以直接借用。
+
+### 图标
+
+没有可假设共享的图标组件；用内联 SVG（`fill="none" stroke="currentColor"`，14×14），
+颜色继承 `--dsw-alias-label-tertiary`，hover 时可到 `--dsw-alias-label-secondary`。
+灰色闪电就是“线性 + currentColor”，不再用 emoji。
+
 ## 需要先定下来的问题
 
 1. 灰色闪电的落点：只改 turnTail 行，还是 dock 行统一？用内联 SVG（`currentColor`）
