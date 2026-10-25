@@ -1,5 +1,7 @@
 # SoL-dsh
 
+中文 | [English](README.en.md)
+
 把 [NVlabs/SoL-Pi](https://github.com/NVlabs/SoL-Pi) 的四种效率机制适配为
 **DeepSeek Harness（DSH）** 的 Cordis 插件包。四个机制**默认全关**，装好后在插件页逐个打开。
 
