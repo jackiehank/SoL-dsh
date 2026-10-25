@@ -80,7 +80,7 @@ lib/reducer.js             诊断日志 → 逐字可核验回执
 lib/compact.js             计划完成点触发 compaction
 lib/savings.js             solDshStats 会话投影
 lib/store.js               归档与精确分页
-client.js                  设置页开关、每轮尾行、节省面板
+client.js                  插件页开关、每轮尾行、节省面板
 locale/{en,zh}.json        包元数据
 icon.svg
 tests/                     node --test，纯函数 + 机制级测试
@@ -97,8 +97,8 @@ node --check lib/index.js
 node --check client.js
 ```
 
-安装插件用 DSH 的 `plugin_manager`（`install_bundle` 指向仓库根），或直接
-`dsh plugin --profile desktop add github:jackiehank/SoL-dsh`；不要手工改 profile。
+安装插件用 DSH 的 `plugin_manager`（`install_bundle` 指向仓库根或 `github:jackiehank/SoL-dsh`）；
+桌面端在插件页 **添加插件** 里装（CLI 拒绝 `--profile desktop`），不要手工改 profile。
 
 ## 7. 实测踩坑
 

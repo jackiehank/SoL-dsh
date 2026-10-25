@@ -1,25 +1,29 @@
 # @jackiehank/sol-dsh
 
 SoL-Pi（<https://github.com/NVlabs/SoL-Pi>，MIT）效率机制的 DSH 移植。Host 半 + Client 半
-（每轮尾行、输入框下方面板、设置页开关），四个机制默认全关。
+（每轮尾行、输入框下方面板、插件页开关），四个机制默认全关。
 **配置键与上游 `sol-pi.json` 一致**，只有 8 个。
 
 ## 安装
 
-像其他开源 DSH 插件一样，直接从 GitHub 仓库安装（依赖由 pnpm 自动装好）：
+桌面端（DSH 0.2.1-rc.3）：侧栏 **插件** → **添加插件**（或箭头 → **安装第三方插件**），
+填 `github:jackiehank/SoL-dsh` 安装，装完**刷新页面**。桌面 profile 由 Electron 持有，
+CLI 会拒绝 `--profile desktop` 的插件管理请求。
+
+其他 profile 用 CLI：
 
 ```powershell
-dsh plugin --profile desktop add github:jackiehank/SoL-dsh
+dsh plugin --profile web add github:jackiehank/SoL-dsh
 ```
 
-- 需要 **DSH 0.2.1-rc.3**（桌面版实测）；更老版本没有 `sessionProjections` 时，
-  历史统计会退回扫当前快照；
-- 装完默认全关；在 **Plugins → SoL-dsh → 机制开关** 里打开需要的机制；
-- 本地开发：在仓库根 `pnpm install`，再用 `plugin_manager` 的 `install_bundle` 指向仓库根。
+- 装完默认全关；在插件页本包的 **机制开关** 里打开需要的机制；
+- 升级 = 先移除再安装；桌面端没有原地更新；
+- 本地开发：在仓库根 `pnpm install`，再用 `plugin_manager` 的 `install_bundle` 指向仓库根
+  （link，不是拷贝）。
 
 ## 开关
 
-**推荐路径：Web GUI 的 Plugins → SoL-dsh → 机制开关。** 四个开关是 Host `Config` 的
+**推荐路径：Web GUI 的插件页 → 本包 → 机制开关。** 四个开关是 Host `Config` 的
 volatile 字段，切换后 Loader 发 `loader/volatile-update`，插件把对应机制挂载/卸载
 （不重载整个插件），并写回 profile 的 `cordis.patch.yml`。
 
@@ -162,7 +166,7 @@ resume 后冷却从头开始。
 
 ## 启用与回退
 
-1. 在 **Plugins → SoL-dsh → 机制开关** 里切换即时生效；改 `cordis.patch.yml` 需要重载插件；
+1. 在插件页本包的 **机制开关** 里切换即时生效；改 `cordis.patch.yml` 需要重载插件；
 2. 回退 = 关掉开关；卸载插件后归档目录留在 `storageRoot`，可自行清理。
 
 归档是本地明文，可能含日志里的敏感内容；`DSH_SOL_DSH_HOME` 不要指向共享目录。
