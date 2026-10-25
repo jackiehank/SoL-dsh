@@ -119,6 +119,19 @@
   “开关拨了但机制没变”。
 - 兼容性：`resolveConfig` 不再手写，未知键/类型错误的文案会变；README 的配置表要同步。
 
+## 落地（0.7.2）
+
+- **Host**：`Config` 用 schemastery 声明 8 个键，四个机制布尔 + 归约 provider/model + ratio
+  标 `.volatile()`；`apply` 把每个机制挂在**子 fiber**（`ctx.plugin`）上，监听
+  `loader/volatile-update` 后按新值重挂，不重载整个插件。
+- **Client**：`plugins.bundle.config` 同时注册两个 key（行 id `sol-dsh` 与包名 `@local/sol-dsh`）；
+  组件用 `ctx.get('configForms')` 找命名空间，先按 `actionFusion` 字段匹配、再对 schema 信封做
+  文本回退；四个开关直接 `form.set(field, checked)`。
+- **验证**：开关 ObservationPack → Host 收到 `volatile-update paths:[["observationPack"]]`；
+  同一条 27 KB 输出，开时换成 `obs_…` 句柄，关时原样返回，再开又换成新句柄。
+- **依赖**：`@deepseek-ai/schemastery@3.18.5` + `@deepseek-ai/cosmokit@1.8.6`（lockfile 已提交）；
+  这是唯一新增的运行时依赖。
+
 ## 结论
 
 1. **排法定 A**：次数放进标签（`收纳（10 次）` → `28.3k tok`），保留 DSH 的两列

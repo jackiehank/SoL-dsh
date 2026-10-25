@@ -1,6 +1,6 @@
 {
   "name": "@local/sol-dsh",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "private": true,
   "type": "module",
   "description": "SoL-Pi 四个效率机制在 DSH 上的移植（默认全关）",
