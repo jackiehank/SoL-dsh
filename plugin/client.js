@@ -312,9 +312,9 @@ window.__ModuleLoader__.load({
 
       const rows = [
         [t('rowFusion'), t('fusionValue', { count: summary.fusion })],
-        [t('rowPack'), `${summary.pack} · ${compactNumber(summary.packTokens)} tok`],
-        [t('rowReceipt'), `${summary.receipt} · ${compactNumber(summary.receiptTokens)} tok`],
-        [t('rowCompact'), `${summary.compact} · ${compactNumber(summary.compactTokens)} tok`],
+        [t('rowWithCount', { label: t('rowPack'), count: summary.pack }), `${compactNumber(summary.packTokens)} tok`],
+        [t('rowWithCount', { label: t('rowReceipt'), count: summary.receipt }), `${compactNumber(summary.receiptTokens)} tok`],
+        [t('rowWithCount', { label: t('rowCompact'), count: summary.compact }), `${compactNumber(summary.compactTokens)} tok`],
         [t('rowPercent'), `${percentText}%`],
       ]
 
@@ -390,6 +390,7 @@ window.__ModuleLoader__.load({
                 rowCompact: '压缩',
                 rowFusion: '融合',
                 rowPercent: '工具输出少写',
+                rowWithCount: '{label}（{count} 次）',
                 fusionValue: '{count} 次往返',
                 footnote: '估算：4 字符 ≈ 1 token；只计首次写入，不含后续缓存读取。',
               },
@@ -403,6 +404,7 @@ window.__ModuleLoader__.load({
                 rowCompact: 'Compacted',
                 rowFusion: 'Fused',
                 rowPercent: 'Tool output saved',
+                rowWithCount: '{label} ({count}×)',
                 fusionValue: '{count} round-trips',
                 footnote: 'Estimated at 4 chars per token; counts the first write only, not later cache reads.',
               },
