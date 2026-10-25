@@ -88,3 +88,27 @@
   判据：跑一轮带 `then_run` 的 edit 或一条 >10 KiB 的命令，本轮结尾（动作行之前）应出现
   `⚡ 本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0`；没有触发任何机制的轮次不应出现该行。
 
+## 结论
+
+1. **DSH 里“工具卡标题”不是插件能改的地方**：聊天行的标题由客户端按工具名 + locale 决定
+   （`tool-call-model.d.ts` 的 `VARIANT_TITLE_KEYS`），行内其余字段从 args / result content 推导；
+   `presentCall`/`presentResult` 在本 build 没有任何消费者，改它们的 `title` 不会有可见效果。
+   上一轮的徽标实现因此撤回，只保留 `output.presentationMeta`（客户端确实会收到 `meta`）。
+2. **可见反馈的落点是 Client slot，不是 Host 渲染层**：选 `conversation.chat.turnTail`——list、session scope、
+   `replaceRisk: none`，与 deliverables / plan / schedule-created 并列，属于加法而不是接管。
+3. **已落地**：`@local/sol-dsh@0.3.0` 现在是一个带 Client 半的 bundle，每轮结束在动作行之前渲染
+   `⚡ 本轮：融合 N · 收纳 N · 回执 N · 压缩 N`；四计数全零时不渲染。数据来自会话里本来就有的字面量标记，
+   不花模型 token、不开新通道。
+4. **与上游的对应关系**：上游那套“4 秒状态行 + 卡片横幅”在 DSH 里没有等价物（没有 TUI 状态行、
+   没有可用的 toast key、卡片标题不可插），所以这里换成了**每轮一行、常驻可回顾**的形态——
+   比上游的瞬时提示更适合 Web 会话流，代价是需要刷新页面才加载新 bundle。
+
+### 已知边界
+
+- 计数依赖字面量（`[then_run:succeeded]`、占位符首行、回执头、`compaction` 节点）。机制文案若改，需要同步；
+  测试里没有覆盖 Client 半（浏览器代码不在 Node 单测范围内），只做了 `node --check`。
+- 只统计“融合成功”；`then_run` 失败/跳过不计入，与上游口径一致。
+- 这一行只给次数，不给字节/省下的 token；要做“本轮少发多少 KiB”需要把 `meta` 汇总起来（下一步可选）。
+- 需要 Web 页面重载才生效：Client 半是浏览器模块，Host 侧重载不会带上它。
+
+
