@@ -113,28 +113,6 @@ export async function assertUnchangedBeforeCommand(resolvePath, exec, filePath) 
 }
 
 /**
- * 融合徽标：只进 UI 的 `presentCall`/`presentResult`，不进 `output.render`，
- * 因此不增加任何模型上下文（与上游 TUI 的横幅等价，见 docs/issues/sol-dsh-visibility.md）。
- */
-export const FUSION_BADGE = '⚡ 融合 · 省 1 次模型往返'
-
-/** 这次调用的参数里有 `then_run` 吗（展示层只读不校验）。 */
-function wantsFusion(args) {
-  return args !== null && typeof args === 'object' && args.then_run !== undefined
-}
-
-/**
- * 给工具自己的渲染意图加一句徽标；标题为空时用徽标当标题，视图缺失时原样返回。
- * 只改 `title`，不碰 `card`/`diffs`/`content`，原生 diff 卡、终端卡、follow-along 都保持原样。
- */
-export function withBadge(view, badge) {
-  if (view === null || typeof view !== 'object') return view
-  if (typeof badge !== 'string' || badge.length === 0) return view
-  const title = typeof view.title === 'string' && view.title.length > 0 ? `${view.title} · ${badge}` : badge
-  return { ...view, title }
-}
-
-/**
  * 生成遮蔽用的工具定义。
  *
  * @param options.name - 被遮蔽的工具名（edit / write）。
@@ -194,16 +172,8 @@ export function createFusedDefinition({ name, base, runCommand, resolveFilePath 
 
   if (base.timeoutMs !== undefined) definition.timeoutMs = base.timeoutMs
   if (typeof base.isConcurrencySafe === 'function') definition.isConcurrencySafe = (args) => base.isConcurrencySafe(args)
-  if (typeof base.presentCall === 'function') {
-    definition.presentCall = (args) => withBadge(base.presentCall(args), wantsFusion(args) ? FUSION_BADGE : undefined)
-  }
-  if (typeof base.presentResult === 'function') {
-    // 失败/跳过的命令没有省下任何往返，和上游一样不给徽标；UI 也按 isError 重绘。
-    definition.presentResult = (args, result) => withBadge(
-      base.presentResult(args, result),
-      wantsFusion(args) && result?.isError !== true ? FUSION_BADGE : undefined,
-    )
-  }
+  if (typeof base.presentCall === 'function') definition.presentCall = (args) => base.presentCall(args)
+  if (typeof base.presentResult === 'function') definition.presentResult = (args, result) => base.presentResult(args, result)
 
   return definition
 }

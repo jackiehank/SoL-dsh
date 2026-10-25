@@ -9,7 +9,6 @@ import {
   THEN_RUN_FAILED,
   THEN_RUN_SKIPPED,
   THEN_RUN_SUCCEEDED,
-  withBadge,
   withThenRun,
 } from '../plugin/lib/action-fusion.js'
 import { createAgentScope, createRootContext } from './helpers.mjs'
@@ -296,54 +295,28 @@ test('基线工具只挂在 agent scope 时也要装得上（不能只看全局�
   }
 })
 
-test('展示层：融合徽标只加在 presentCall/presentResult，失败调用不给', () => {
-  const diff = () => ({
+test('展示层：presentCall/presentResult 原样转发基线的渲染意图（不增删字段）', () => {
+  const view = {
     card: 'diff',
     title: 'Edit a.txt',
     diffs: [{ path: 'a.txt', oldText: 'a', newText: 'b' }],
-  })
-  const withPresenters = { ...makeBase(), presentCall: diff, presentResult: diff }
-  const definition = createFusedDefinition({
-    name: 'edit',
-    base: withPresenters,
-    runCommand: async () => ({ failed: false, text: '' }),
-  })
+  }
+  const base = { ...makeBase(), presentCall: () => view, presentResult: () => view }
+  const definition = createFusedDefinition({ name: 'edit', base, runCommand: async () => ({ failed: false, text: '' }) })
 
-  // 没有 then_run：原生渲染意图原样透传（diff 卡、标题都不动）
-  assert.deepEqual(definition.presentCall({ file_path: 'a.txt' }), diff())
-
-  // 有 then_run：标题追加徽标，card 与 diffs 保持不变
-  const callView = definition.presentCall({ file_path: 'a.txt', then_run: { command: 'npm test' } })
-  assert.equal(callView.card, 'diff')
-  assert.match(callView.title, /⚡ 融合/u)
-  assert.deepEqual(callView.diffs, diff().diffs)
-
-  const okView = definition.presentResult(
-    { file_path: 'a.txt', then_run: { command: 'npm test' } },
-    { content: [], isError: false },
+  // 带不带 then_run、成功失败都原样返回：展示层不属于本机制（标题不在这里改）
+  assert.equal(definition.presentCall({ file_path: 'a.txt' }), view)
+  assert.equal(definition.presentCall({ file_path: 'a.txt', then_run: { command: 'npm test' } }), view)
+  assert.equal(
+    definition.presentResult({ file_path: 'a.txt', then_run: { command: 'npm test' } }, { content: [], isError: true }),
+    view,
   )
-  assert.match(okView.title, /⚡ 融合/u)
-
-  // 命令失败不算省下往返，和上游一样不显示横幅
-  const failedView = definition.presentResult(
-    { file_path: 'a.txt', then_run: { command: 'npm test' } },
-    { content: [], isError: true },
-  )
-  assert.equal(failedView.title, 'Edit a.txt')
 })
 
 test('展示层：基线没有 presenter 时不凭空造卡片', () => {
   const definition = createFusedDefinition({ name: 'edit', base: makeBase(), runCommand: async () => ({ failed: false, text: '' }) })
   assert.equal(definition.presentCall, undefined)
   assert.equal(definition.presentResult, undefined)
-})
-
-test('withBadge：缺卡片或缺徽标时原样返回，空标题用徽标兜底', () => {
-  assert.equal(withBadge(undefined, '⚡'), undefined)
-  assert.equal(withBadge(null, '⚡'), null)
-  const view = { card: 'generic', title: '' }
-  assert.equal(withBadge(view, undefined), view)
-  assert.deepEqual(withBadge(view, '⚡'), { card: 'generic', title: '⚡' })
 })
 
 

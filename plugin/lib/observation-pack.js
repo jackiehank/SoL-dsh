@@ -19,17 +19,6 @@ export const PLACEHOLDER_EXCERPT_BYTES = 1024
 const RECEIPT_PREFIX = 'sol_pi_evidence_receipt_v1'
 const CHARS_PER_TOKEN = 4
 
-/** 卡片横幅：只出现在 `presentResult` 里，不增加模型上下文（上游 TUI 横幅的对应物）。 */
-export const OBSERVATION_PACK_BADGE = '⚡ ObservationPack · 大观测以句柄代替原文，未整段重放'
-
-/** 人类可读字节数，仅用于展示层。 */
-export function formatBytes(bytes) {
-  const value = Number.isFinite(bytes) ? Math.max(0, Math.round(bytes)) : 0
-  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1).replace(/\.0$/u, '')} MiB`
-  if (value >= 1024) return `${(value / 1024).toFixed(1).replace(/\.0$/u, '')} KiB`
-  return `${value} B`
-}
-
 export { DEFAULT_THRESHOLD_BYTES as THRESHOLD_BYTES }
 
 /** 结果内容是否是“纯文本、非错误”——只有这种才参与打包。 */
@@ -215,7 +204,7 @@ export function createRecallDefinition({ store, maxBytes = 16 * 1024, maxLines =
       render(_args, value) {
         return [{ type: 'text', text: `${value.header}\n${value.text}` }]
       },
-      // 只给 UI 用的投影（随会话日志持久化），模型看不到；presentResult 靠它还原字节/行数。
+      // 只给 UI 用的投影（随会话日志持久化，客户端以 `meta` 收到），模型看不到。
       presentationMeta(_args, value) {
         return {
           id: value.id,
@@ -226,27 +215,6 @@ export function createRecallDefinition({ store, maxBytes = 16 * 1024, maxLines =
           eof: value.eof,
         }
       },
-    },
-    /** 待执行状态：标题写清楚在读哪个句柄、从哪一页开始。 */
-    presentCall(args) {
-      const id = typeof args?.id === 'string' && args.id.length > 0 ? args.id : 'obs_…'
-      const offset = Number.isInteger(args?.offset) ? args.offset : 0
-      return { card: 'generic', title: `读取归档观测 ${id}`, kind: 'read', rawInput: { id, offset } }
-    },
-    /** 完成状态：标题带本页字节/行数，正文末尾加一句“原文未重放”的说明（不进模型上下文）。 */
-    presentResult(_args, result) {
-      const meta = result?.meta ?? {}
-      const bytes = Number.isFinite(meta.bytes) ? meta.bytes : 0
-      const lines = Number.isFinite(meta.lines) ? meta.lines : 0
-      const title = `obs_recall · ${formatBytes(bytes)} · ${lines} 行${meta.eof === false ? '（还有下一页）' : ''}`
-      return {
-        card: 'generic',
-        title,
-        content: [
-          ...(Array.isArray(result?.content) ? result.content : []),
-          { type: 'text', text: OBSERVATION_PACK_BADGE },
-        ],
-      }
     },
     async execute(args, exec) {
       const id = args?.id

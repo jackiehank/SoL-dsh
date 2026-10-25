@@ -1,17 +1,19 @@
 {
   "name": "@local/sol-dsh",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "SoL-Pi 四个效率机制在 DSH 上的移植（默认全关）",
   "license": "MIT",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "lib/*.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg"
@@ -19,9 +21,16 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
     }
   }
 }
-
-
-

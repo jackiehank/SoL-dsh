@@ -9,7 +9,6 @@ import {
   createObservation,
   createPostExecuteHandler,
   createRecallDefinition,
-  formatBytes,
   placeholderFor,
   textOfContent,
 } from '../plugin/lib/observation-pack.js'
@@ -204,7 +203,7 @@ test('obs_recall：未知 id、非法 id、越界 offset 都报错', async () =>
   }
 })
 
-test('展示层：obs_recall 卡片标题带字节/行数，横幅只出现在卡片里', async () => {
+test('展示层：obs_recall 的 presentationMeta 带字节/行数，且只在 meta 里（不进模型内容）', async () => {
   const { root, store } = await tempStore()
   try {
     const text = 'x'.repeat(3000)
@@ -213,37 +212,24 @@ test('展示层：obs_recall 卡片标题带字节/行数，横幅只出现在�
     const recall = createRecallDefinition({ store })
     const value = await recall.execute({ id }, exec)
 
-    // 投影随结果持久化，只给 UI 用
+    // 投影随结果持久化（客户端以 meta 收到），只给 UI 用
     const meta = recall.output.presentationMeta({}, value)
     assert.equal(meta.id, id)
     assert.equal(meta.bytes, 3000)
     assert.equal(meta.lines, value.lines)
+    assert.equal(meta.eof, value.eof)
 
-    // 卡片标题带人类可读字节数，正文末尾是横幅
-    const view = recall.presentResult({ id }, { content: [{ type: 'text', text: 'page' }], isError: false, meta })
-    assert.equal(view.card, 'generic')
-    assert.match(view.title, /2\.9 KiB/u)
-    assert.equal(view.content.length, 2)
-    assert.match(view.content[1].text, /ObservationPack/u)
-
-    // 模型看到的内容里没有横幅（present* 不进上下文）
+    // 模型看到的内容只有 header + 正文，没有额外展示文案
     const rendered = recall.output.render({}, value)
     assert.equal(rendered.length, 1)
-    assert.doesNotMatch(rendered[0].text, /⚡/u)
+    assert.equal(rendered[0].text, `${value.header}\n${value.text}`)
 
-    assert.equal(recall.presentCall({ id, offset: 0 }).kind, 'read')
+    // 卡片的 title 不在本机消费（present* 无消费者），因此工具定义里不再声明 presenter
+    assert.equal(recall.presentCall, undefined)
+    assert.equal(recall.presentResult, undefined)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-})
-
-test('formatBytes：B / KiB / MiB 三档', () => {
-  assert.equal(formatBytes(0), '0 B')
-  assert.equal(formatBytes(900), '900 B')
-  assert.equal(formatBytes(2048), '2 KiB')
-  assert.equal(formatBytes(3000), '2.9 KiB')
-  assert.equal(formatBytes(3 * 1024 * 1024), '3 MiB')
-  assert.equal(formatBytes(undefined), '0 B')
 })
 
 test('归档已存在：同内容复用，异内容报损坏（不是缓存命中）', async () => {

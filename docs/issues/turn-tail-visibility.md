@@ -49,3 +49,42 @@
 3. 段落形如 `⚡ 融合 1 · 收纳 1 · 回执 1 · 压缩 1`，四计数全零时返回 null；
 4. 主机侧测试仍全绿；client 半可语法检查（`node --check`）；
 5. 真机验证需要重载 Web 客户端（页面刷新或重启应用），在跑过融合/收纳的一轮之后应出现该行。
+
+## 落地
+
+### 撤掉无效改动（宿主半）
+
+- `plugin/lib/action-fusion.js`：删掉 `FUSION_BADGE`/`withBadge`/`wantsFusion`，`presentCall`/`presentResult`
+  恢复成原样转发（`definition.presentCall = (args) => base.presentCall(args)`）；
+- `plugin/lib/observation-pack.js`：删掉 `presentCall`/`presentResult`/`OBSERVATION_PACK_BADGE`/`formatBytes`，
+  **保留** `output.presentationMeta`（客户端真的会收到 `meta`，diff/read/search 卡靠它）；
+- 测试相应调整：`present*` 的断言改成“原样转发、不增删字段”，`obs_recall` 只断言 meta 与模型可见内容不变。
+
+### 新增 Client 半（每轮一行）
+
+- `plugin/package.json`：版本 `0.3.0`；`exports` 增加 `./client`；`files` 加入 `client.js`；
+  `dsh.client = { platform: 'web', immediately: true, inject: [locale, ui-chat, ui-conversation, ui-renderer] }`。
+- `plugin/client.js`：`window.__ModuleLoader__.load({ id: '@local/sol-dsh', factory })`，
+  - 在 `apply` 里 `ctx.locale.register('sol-dsh', { zh, en })` 注册文案；
+  - `ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({ name, id: 'sol-dsh', order: 5, locale: 'sol-dsh' }, TailRow))`；
+  - `TailRow` 用两个稳定选择器读快照（`s.locations`、`s.nodes`），按 `turn.turn` 取本轮节点计数；
+    四个计数全为 0 时返回 `null`（整条不渲染）；
+  - 文案：`⚡ 本轮：融合 {fusion} · 收纳 {pack} · 回执 {receipt} · 压缩 {compact}`（占位符缺失时用固定串兜底）。
+
+### 计数口径
+
+| 计数 | 判据（本轮任一工具结果的文本里） |
+| --- | --- |
+| 融合 | `[then_run:succeeded]`（只算跑成功的，失败/跳过不算省往返） |
+| 收纳 | `[large tool result replaced before it entered the context]` |
+| 回执 | `sol_pi_evidence_receipt_v1` |
+| 压缩 | 本轮存在 `kind === 'compaction'` 的节点（DSH 原生压缩，含我们触发的） |
+
+## 验证
+
+- 宿主半：`node tests/*.test.mjs` 全绿（55 项；删掉 2 项徽标测试、新增 1 项原样转发测试）；
+- Client 半：`node --check plugin/client.js` 通过；重新安装为 `@local/sol-dsh@0.3.0`（`application: applied`）；
+- **真机未验证**：Client 半要等 Web 页面重载（刷新或重启应用）才会加载新 bundle。
+  判据：跑一轮带 `then_run` 的 edit 或一条 >10 KiB 的命令，本轮结尾（动作行之前）应出现
+  `⚡ 本轮：融合 1 · 收纳 1 · 回执 0 · 压缩 0`；没有触发任何机制的轮次不应出现该行。
+
