@@ -43,21 +43,36 @@ window.__ModuleLoader__.load({
       return out
     }
 
-    /** 一轮里的四类事件计数。 */
+    /**
+     * 一轮里的四类事件计数。
+     *
+     * 关键形状：Chat 快照里的工具节点是 `kind: 'tool-call'`，真正的结果在 `data.root` 里
+     * （`ToolCallBlock` 联合：运行中是 RunningToolCall，落定后是 `kind: 'tool-result'`）。
+     * 没有 `tool-result` 这一层级的 Chat 节点，所以必须从 `data.root` 往下找。
+     */
     function countsOf(keys, nodes) {
       const counts = { fusion: 0, pack: 0, receipt: 0, compact: 0 }
-      for (const key of keys) {
-        const node = nodes.get(key)
-        if (node === undefined) continue
-        if (node.kind === 'compaction') {
-          counts.compact += 1
-          continue
-        }
-        if (node.kind !== 'tool-result') continue
-        const text = textOf(node)
+      const countText = (text) => {
         if (text.includes(FUSION_MARK)) counts.fusion += 1
         if (text.includes(PACK_MARK)) counts.pack += 1
         if (text.includes(RECEIPT_MARK)) counts.receipt += 1
+      }
+      const walk = (block) => {
+        if (block === null || typeof block !== 'object') return
+        if (block.kind === 'tool-result') {
+          countText(textOf(block))
+          for (const sub of Array.isArray(block.subCalls) ? block.subCalls : []) walk(sub)
+        }
+      }
+      for (const key of keys) {
+        const node = nodes.get(key)
+        if (node === undefined) continue
+        if (node.kind === 'compaction' || node.kind === 'manual-compaction') {
+          counts.compact += 1
+          continue
+        }
+        if (node.kind !== 'tool-call') continue
+        walk(node.data?.root)
       }
       return counts
     }
@@ -82,15 +97,25 @@ window.__ModuleLoader__.load({
       const debug = debugEnabled()
       let counts = { fusion: 0, pack: 0, receipt: 0, compact: 0 }
       let counted = false
-      // chain 座位把 select 的返回值作为 `matched` 传入；标准 props 里带 useChat。
+      // list 座位的 owner 直接给 turn；标准 props 里带 useChat。
       if (typeof useChat === 'function' && typeof turnNo === 'number') {
         try {
           const locations = useChat((snapshot) => snapshot.locations)
           const nodes = useChat((snapshot) => snapshot.nodes)
-          counts = countsOf(locations.getTurn(turnNo), nodes)
+          const keys = locations.getTurn(turnNo)
+          counts = countsOf(keys, nodes)
           counted = true
-        } catch {
+          if (debug) {
+            // 排障：把这一轮的节点形状打到控制台，一眼能看出是“没节点”还是“节点形状不对”。
+            const kinds = keys.map((key) => {
+              const node = nodes.get(key)
+              return node === undefined ? 'undefined' : node.kind
+            })
+            console.debug('[sol-dsh] turn', turnNo, 'keys', keys.length, 'kinds', kinds.join(',') || '(none)')
+          }
+        } catch (error) {
           counted = false
+          if (debug) console.debug('[sol-dsh] count failed', error)
         }
       }
       const total = counts.fusion + counts.pack + counts.receipt + counts.compact
