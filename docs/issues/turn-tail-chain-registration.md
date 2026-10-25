@@ -1,0 +1,26 @@
+# turnTail 没渲染：座位其实是 chain，不是 list
+
+## 问题
+
+`conversation.chat.turnTail` 的插件装好后（`@local/sol-dsh@0.3.0`），刷新页面看不到任何一行
+`⚡ 本轮：融合 …`。于是回读运行时代码，发现注册方式错了：
+
+- `cordis_inspect_query(client, Slots, listSubTree)` 报告这个座位是 `kind: 'list'`、`id` 必填；
+- 但实际渲染它的是 ui-chat 的 `TurnTailNodeView`（`lib/client.js:3636` 起）：
+  ```js
+  const tail = renderSlotChain("conversation.chat.turnTail", { turn, seq, openFile })
+  ```
+  也就是说它是 **chain**，注册键是 `select`；`select(owner)` 的返回值会以 `matched` 传给组件。
+  唯一在用的第三方占用者 `deliverables` 就是用 `select` 注册的，没有 `id`。
+- 我们按 list 的 `id` 注册，`select` 缺失 → 该条目不会被这条 chain 取到，于是永远不渲染。
+
+顺带确认组件能拿到什么：`renderSlotChain` 只传 owner（`turn`、`seq`、`openFile`），
+session 标准 props（含 `useChat`、`t`）由会话上下文注入——`deliverables` 的组件就在用 `t`/`sessionId`/`useSessions`。
+
+## 验收
+
+1. 注册改成 `{ select: (owner) => owner, locale: NS }`（chain 语义）；
+2. 组件用 `useChat` 读快照计数；`useChat` 缺失时安全返回 `null`，不抛错；
+3. 加一个可选的调试开关（`localStorage['sol-dsh:debug'] === '1'`）：打开后即使本轮零命中也会渲染
+   `⚡ sol-dsh 已加载（本轮无机制命中）`，用来区分“插件没加载”和“计数为 0”；
+4. 重新安装并刷新页面后：命中轮次出现计数行，零命中轮次不出现（除非打开调试开关）。
