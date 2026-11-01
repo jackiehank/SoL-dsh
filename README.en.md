@@ -2,6 +2,8 @@
 
 [中文](README.md) | English
 
+[![dsh.so risk](https://cdn.dsh.so/badge/sol-dsh.svg)](https://www.dsh.so/artifact/sol-dsh/?ref=badge)
+
 Ports the four efficiency mechanisms of [NVlabs/SoL-Pi](https://github.com/NVlabs/SoL-Pi) to
 **DeepSeek Harness (DSH)** as a Cordis plugin bundle. All four mechanisms are **off by default**;
 turn them on one by one on the Plugins page after installing.
